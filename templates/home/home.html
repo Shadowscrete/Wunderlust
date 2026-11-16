@@ -1,0 +1,28 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wunderlust</title>
+    <link rel="stylesheet" href="{% static 'home/home.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{% url 'home' %}">Wunderlust</a>
+        <nav class="auth-links" aria-label="Account">
+            <a class="login-link" href="{% url 'login' %}">Log in</a>
+            <a class="signup-link" href="{% url 'register' %}">Sign up</a>
+        </nav>
+    </header>
+
+    <main class="home-main">
+        <section class="welcome">
+            <p class="eyebrow">TRAVEL, YOUR WAY</p>
+            <h1>Welcome to<br>Wunderlust.</h1>
+            <p class="welcome-copy">Your travel adventure starts here.</p>
+            <a class="get-started" href="{% url 'register' %}">Create an account</a>
+        </section>
+    </main>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Signed in | Wunderlust</title>
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}">
+</head>
+<body>
+    <main class="auth-page">
+        <section class="auth-card">
+            <a class="brand" href="{% url 'home' %}">Wunderlust</a>
+            <h1>You are signed in</h1>
+            <p class="form-intro">Welcome back, {{ username }}.</p>
+            <a class="submit-button" href="{% url 'home' %}">Continue to home</a>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="text-button" type="submit">Sign out</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

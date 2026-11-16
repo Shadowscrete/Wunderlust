@@ -1,0 +1,141 @@
+:root {
+    --ink: #223843;
+    --muted: #64727a;
+    --background: #eff1f3;
+    --border: #d7dde0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    background: var(--background);
+    color: var(--ink);
+    font-family: "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.site-header {
+    display: flex;
+    min-height: 76px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 max(28px, calc((100vw - 1080px) / 2));
+    border-bottom: 1px solid var(--border);
+}
+
+.brand {
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    text-decoration: none;
+}
+
+.auth-links {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.login-link,
+.signup-link,
+.get-started {
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.login-link {
+    color: var(--ink);
+}
+
+.signup-link {
+    padding: 10px 15px;
+    border-radius: 4px;
+    background: var(--ink);
+    color: #fff;
+}
+
+.home-main {
+    display: grid;
+    min-height: calc(100vh - 76px);
+    place-items: center;
+    padding: 80px 24px;
+}
+
+.welcome {
+    width: min(100%, 620px);
+    text-align: center;
+}
+
+.eyebrow {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+}
+
+.welcome h1 {
+    margin: 0;
+    font-size: clamp(40px, 6vw, 60px);
+    font-weight: 600;
+    letter-spacing: -0.06em;
+    line-height: 1.06;
+}
+
+.welcome-copy {
+    margin: 20px 0 28px;
+    color: var(--muted);
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.get-started {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 0 16px;
+    border-radius: 4px;
+    background: var(--ink);
+    color: #fff;
+}
+
+.signup-link:hover,
+.get-started:hover {
+    background: #304d5b;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
+
+.signup-link:focus-visible,
+.get-started:focus-visible,
+.login-link:focus-visible,
+.brand:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+    .site-header {
+        min-height: 68px;
+        padding: 0 20px;
+    }
+
+    .auth-links {
+        gap: 16px;
+    }
+
+    .home-main {
+        min-height: calc(100vh - 68px);
+        place-items: center;
+        padding: 56px 24px;
+    }
+}

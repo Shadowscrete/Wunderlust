@@ -1,7 +1,34 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}Activities | Wunderlust{% endblock %}
+{% block title %}Activity | Wunderlust{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">YOUR DAYS, IN ONE PLACE</p><h1>Activities</h1><p class="page-subtitle">Recent and upcoming itinerary activities across your trips.</p></div></div>
-<section class="dashboard-section activity-page-list">{% for activity in page_obj %}<article class="activity-page-row"><div class="activity-date-block"><strong>{{ activity.day.date|date:"j" }}</strong><span>{{ activity.day.date|date:"M" }}</span></div><div class="activity-page-content"><div class="activity-page-title"><h2>{{ activity.title }}</h2>{% if activity.is_recommended %}<span class="recommendation-label">Suggested</span>{% endif %}</div><p>{{ activity.day.trip.destination }}{% if activity.day.trip.country %}, {{ activity.day.trip.country }}{% endif %}{% if activity.location %}<span> · {{ activity.location }}</span>{% endif %}</p></div><span class="activity-page-time">{% if activity.start_time %}{{ activity.start_time|time:"g:i A" }}{% else %}Flexible{% endif %}</span><a class="activity-open" href="{% url 'trip_detail' activity.day.trip_id %}" aria-label="Open {{ activity.day.trip.destination }} trip">→</a></article>{% empty %}<div class="empty-state"><strong>No activities yet.</strong><p>Plan a trip and add a suggested itinerary to see activities here.</p><a href="{% url 'trip_create' %}" class="button button-primary">Plan a trip</a></div>{% endfor %}</section>
-{% if page_obj.has_next %}<div class="load-more-row"><a class="button button-secondary" href="?page={{ page_obj.next_page_number }}">Show 10 more activities <span aria-hidden="true">↓</span></a><span>{{ page_obj.end_index }} shown</span></div>{% endif %}
+<div class="page-heading"><div><p class="eyebrow">YOUR TRAVEL LOG</p><h1>Activity</h1><p class="page-subtitle">Itinerary activity and past notifications from the last 30 days.</p></div></div>
+<nav class="feed-filters" id="past-notifications" aria-label="Filter activity">
+    <a class="feed-filter {% if kind == 'all' %}active{% endif %}" href="?type=all"{% if kind == 'all' %} aria-current="page"{% endif %}>All</a>
+    <a class="feed-filter {% if kind == 'log' %}active{% endif %}" href="?type=log"{% if kind == 'log' %} aria-current="page"{% endif %}><span class="feed-dot log"></span>Activity log</a>
+    <a class="feed-filter {% if kind == 'notification' %}active{% endif %}" href="?type=notification"{% if kind == 'notification' %} aria-current="page"{% endif %}><span class="feed-dot notification"></span>Notifications</a>
+</nav>
+<section class="dashboard-section activity-page-list">
+{% for entry in page_obj %}{% with item=entry.item %}
+    <article class="activity-page-row feed-row">
+        <div class="activity-date-block"><strong>{{ entry.when|date:"j" }}</strong><span>{{ entry.when|date:"M" }}</span></div>
+        <div class="activity-page-content">
+            <div class="activity-page-title">
+                <span class="feed-type {{ entry.kind }}">{% if entry.kind == 'log' %}Log{% else %}Notification{% endif %}</span>
+                <h2>{{ item.title }}</h2>
+                {% if entry.kind == 'log' and item.is_recommended %}<span class="recommendation-label">Suggested</span>{% endif %}
+            </div>
+            {% if entry.kind == 'log' %}
+                <p>{{ item.day.trip.destination }}{% if item.day.trip.country %}, {{ item.day.trip.country }}{% endif %}{% if item.location %}<span> · {{ item.location }}</span>{% endif %}</p>
+            {% else %}
+                <p>{{ item.message|default:"There’s a new update for your travel space." }}{% if item.trip %}<span> · {{ item.trip.destination }}</span>{% endif %}</p>
+            {% endif %}
+        </div>
+        <span class="activity-page-time">{% if entry.has_time %}{{ entry.when|time:"g:i A" }}{% else %}Flexible{% endif %}</span>
+        {% if entry.kind == 'log' %}<a class="activity-open" href="{% url 'trip_detail' item.day.trip_id %}" aria-label="Open {{ item.day.trip.destination }} trip">→</a>{% elif item.trip_id %}<a class="activity-open" href="{% url 'trip_detail' item.trip_id %}" aria-label="Open {{ item.trip.destination }} trip">→</a>{% else %}<span></span>{% endif %}
+    </article>
+{% endwith %}{% empty %}
+    <div class="empty-state"><strong>{% if kind == 'notification' %}No past notifications.{% elif kind == 'log' %}No activity logged yet.{% else %}Nothing here yet.{% endif %}</strong><p>{% if kind == 'notification' %}Today’s updates live in your inbox and move here the next day.{% else %}Your itinerary activity and past notifications from the last 30 days will appear here.{% endif %}</p></div>
+{% endfor %}
+</section>
+{% if page_obj.has_next %}<div class="load-more-row"><a class="button button-secondary" href="?type={{ kind }}&page={{ page_obj.next_page_number }}">Show more <span aria-hidden="true">↓</span></a><span>{{ page_obj.end_index }} of {{ page_obj.paginator.count }} shown</span></div>{% endif %}
 {% endblock %}

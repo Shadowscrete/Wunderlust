@@ -71,6 +71,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'accounts.context_processors.user_prefs',
             ],
         },
     },
@@ -97,8 +98,14 @@ DATABASES = {
         'OPTIONS': {
             'sslmode': 'require',
         },
+        # Reuse the SSL connection to the remote database instead of reconnecting on every request.
+        'CONN_MAX_AGE': 600,
+        'CONN_HEALTH_CHECKS': True,
     }
 }
+
+# Sessions are read from memory first and only fall back to the database, saving a round-trip per request.
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
 
 # Password validation
@@ -147,3 +154,8 @@ MAILERS = {
 
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
+
+
+# Uploaded files (profile pictures).
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

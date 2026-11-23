@@ -1,0 +1,76 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Settings | Wunderlust{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">YOUR ACCOUNT</p><h1>Settings</h1><p class="page-subtitle">Manage how Wunderlust looks, what reaches your inbox and how you sign in. Personal details live on <a href="{% url 'profile' %}">your profile</a>.</p></div></div>
+
+<div class="settings-stack">
+    <section class="dashboard-section settings-card" id="appearance">
+        <div class="settings-card-intro"><h2>Appearance</h2><p>Choose how the dashboard looks on this account.</p></div>
+        <form method="post" data-autosubmit>{% csrf_token %}<input type="hidden" name="action" value="appearance">
+            <div class="theme-options" role="radiogroup" aria-label="Theme">
+                {% for radio in appearance_form.theme %}
+                <label class="theme-option">
+                    {{ radio.tag }}
+                    <span class="theme-preview theme-preview-{{ radio.data.value }}" aria-hidden="true"><span></span><span></span><span></span></span>
+                    <span class="theme-option-label">{{ radio.choice_label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <noscript><div class="settings-actions"><button class="button button-primary" type="submit">Save</button></div></noscript>
+        </form>
+    </section>
+
+    <section class="dashboard-section settings-card" id="notifications">
+        <div class="settings-card-intro"><h2>Notifications</h2><p>Pick which updates appear in your inbox.</p></div>
+        <form method="post" class="settings-form">{% csrf_token %}<input type="hidden" name="action" value="notifications">
+            {% for field in notification_form %}
+            <label class="toggle-row">
+                <span class="toggle-copy"><strong>{{ field.label }}</strong><small>{{ field.help_text }}</small></span>
+                {{ field }}<span class="toggle-switch" aria-hidden="true"></span>
+            </label>
+            {% endfor %}
+            <div class="settings-actions"><button class="button button-primary" type="submit">Save preferences</button></div>
+        </form>
+    </section>
+
+    <section class="dashboard-section settings-card" id="devices">
+        <div class="settings-card-intro"><h2>Sign-in &amp; devices</h2><p>Browsers where you’re signed in right now. Sign out anything you don’t recognise.</p></div>
+        <div class="settings-form">
+            <ul class="device-list">
+                {% for device in devices %}
+                <li class="device-row">
+                    <span class="device-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+                    <span class="device-copy"><strong>{{ device.label }}{% if device.is_current %} <span class="device-current">This device</span>{% endif %}</strong><small>Signed in {{ device.signed_in|date:"M j, Y · g:i A" }}</small></span>
+                    {% if not device.is_current %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="signout_device"><input type="hidden" name="device" value="{{ device.id }}"><button class="text-button" type="submit">Sign out</button></form>{% endif %}
+                </li>
+                {% empty %}
+                <li class="device-row"><span class="device-copy"><small>No active sessions found.</small></span></li>
+                {% endfor %}
+            </ul>
+            <form method="post" class="settings-actions">{% csrf_token %}<input type="hidden" name="action" value="signout_others"><button class="button button-secondary" type="submit">Sign out of all other devices</button></form>
+        </div>
+    </section>
+
+    <section class="dashboard-section settings-card" id="password">
+        <div class="settings-card-intro"><h2>Change password</h2><p>Use at least 8 characters. Avoid anything easy to guess.</p></div>
+        <form method="post" class="settings-form">{% csrf_token %}<input type="hidden" name="action" value="password">
+            {% if password_form.non_field_errors %}<div class="form-errors">{{ password_form.non_field_errors }}</div>{% endif %}
+            {% for field in password_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+            <div class="settings-actions"><button class="button button-primary" type="submit">Update password</button></div>
+        </form>
+    </section>
+
+    <section class="dashboard-section settings-card danger-card">
+        <div class="settings-card-intro"><h2>Delete account</h2><p>Permanently removes your account, your trips and everything in them. This can’t be undone.</p></div>
+        <div class="settings-actions"><button class="button button-danger" type="button" data-dialog-open="delete-dialog">Delete account…</button></div>
+    </section>
+</div>
+
+<dialog class="modal" id="delete-dialog" aria-labelledby="delete-dialog-title"{% if delete_form.errors %} data-open-on-load{% endif %}>
+    <form method="post" class="modal-body">{% csrf_token %}<input type="hidden" name="action" value="delete">
+        <div class="modal-head"><div><h2 id="delete-dialog-title">Delete your account?</h2><p>Your trips, checklists and itineraries will be permanently deleted.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
+        {% for field in delete_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+        <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-danger" type="submit">Delete permanently</button></div>
+    </form>
+</dialog>
+{% endblock %}

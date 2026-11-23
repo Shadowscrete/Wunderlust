@@ -1,0 +1,74 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Profile | Wunderlust{% endblock %}
+{% block content %}
+{% with user=request.user %}
+<section class="profile-hero">
+    <div class="avatar-editor">
+        <form method="post" action="{% url 'update_avatar' %}" enctype="multipart/form-data" data-avatar-form>{% csrf_token %}
+            <label class="profile-hero-avatar avatar-upload" title="Change profile picture">
+                {% if avatar_url %}<img src="{{ avatar_url }}" alt="">{% else %}<span>{% if user.first_name %}{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}{% else %}{{ user.get_username|slice:":1"|upper }}{% endif %}</span>{% endif %}
+                <span class="avatar-overlay" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+                <input class="visually-hidden" type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Change profile picture">
+            </label>
+        </form>
+        {% if avatar_url %}<form method="post" action="{% url 'update_avatar' %}">{% csrf_token %}<input type="hidden" name="action" value="remove"><button class="text-button avatar-remove" type="submit">Remove</button></form>{% endif %}
+    </div>
+    <div class="profile-hero-copy">
+        <p class="eyebrow">YOUR PROFILE</p>
+        <h1>{{ user.get_full_name|default:user.get_username }}</h1>
+        <p class="profile-hero-meta">@{{ user.get_username }}<span>·</span>{{ user.get_role_display }}<span>·</span>Member since {{ user.date_joined|date:"F Y" }}</p>
+        {% if profile_details.bio %}<p class="profile-bio">{{ profile_details.bio }}</p>{% endif %}
+    </div>
+    <button class="button button-secondary profile-edit" type="button" data-dialog-open="about-dialog">Edit profile</button>
+</section>
+
+{% if stats %}
+<section class="profile-stats" aria-label="Travel stats">
+    <div class="profile-stat"><strong>{{ stats.total }}</strong><span>Trips</span></div>
+    <div class="profile-stat"><strong>{{ stats.upcoming }}</strong><span>Upcoming</span></div>
+    <div class="profile-stat"><strong>{{ stats.completed }}</strong><span>Completed</span></div>
+    <div class="profile-stat"><strong>{{ stats.countries }}</strong><span>{% if stats.countries == 1 %}Country{% else %}Countries{% endif %}</span></div>
+    <div class="profile-stat"><strong>{{ stats.shared }}</strong><span>Shared with me</span></div>
+</section>
+{% endif %}
+
+<div class="profile-grid">
+    <section class="dashboard-section profile-card">
+        <h2>About me</h2>
+        <dl class="profile-details">
+            <div><dt>Full name</dt><dd>{{ user.get_full_name|default:"—" }}</dd></div>
+            <div><dt>Username</dt><dd>{{ user.get_username }}</dd></div>
+            <div><dt>Email</dt><dd>{{ user.email|default:"—" }}</dd></div>
+            <div><dt>Country</dt><dd>{{ profile_details.location|default:"—" }}</dd></div>
+            <div><dt>Birthday</dt><dd>{% if profile_details.birth_date %}{{ profile_details.birth_date|date:"F j, Y" }}{% else %}—{% endif %}</dd></div>
+            <div><dt>Account type</dt><dd>{{ user.get_role_display }}</dd></div>
+        </dl>
+    </section>
+
+    {% if stats %}
+    <section class="dashboard-section profile-card">
+        <div class="profile-card-head"><h2>Coming up</h2><a href="{% url 'trip_list' %}">All trips →</a></div>
+        {% for trip in upcoming_trips %}
+            <a class="profile-trip" href="{% url 'trip_detail' trip.pk %}">
+                <span class="trip-monogram">{{ trip.destination|slice:":2"|upper }}</span>
+                <span class="profile-trip-copy"><strong>{{ trip.destination }}{% if trip.country %}, {{ trip.country }}{% endif %}</strong><small>{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}</small></span>
+                <span class="status-pill status-{{ trip.status|lower }}">{{ trip.get_status_display }}</span>
+            </a>
+        {% empty %}
+            <div class="empty-state"><strong>No upcoming trips.</strong><p>Your next adventure will show up here.</p></div>
+        {% endfor %}
+    </section>
+    {% endif %}
+</div>
+<dialog class="modal" id="about-dialog" aria-labelledby="about-dialog-title"{% if about_form.errors %} data-open-on-load{% endif %}>
+    <form method="post" class="modal-body">{% csrf_token %}
+        <div class="modal-head"><div><h2 id="about-dialog-title">About me</h2><p>Fill in the details about you.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
+        {% if about_form.non_field_errors %}<div class="form-errors">{{ about_form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid">
+            {% for field in about_form %}<div class="form-field{% if field.name == 'bio' %} full-field{% endif %}{% if field.field.disabled %} locked-field{% endif %}">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+        </div>
+        <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button>{% if about_form.has_missing %}<button class="button button-primary" type="submit">Save details</button>{% endif %}</div>
+    </form>
+</dialog>
+{% endwith %}
+{% endblock %}

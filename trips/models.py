@@ -160,3 +160,13 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.title
+
+
+def sync_trip_statuses():
+    """Moves trips along by date: started trips become In progress, finished trips become Completed.
+    Cancelled and already-completed trips are left alone. Two UPDATE queries in total."""
+    from django.utils import timezone
+    today = timezone.localdate()
+    active = Trip.objects.exclude(status__in=(Trip.Status.CANCELLED, Trip.Status.COMPLETED))
+    active.filter(end_date__lt=today).update(status=Trip.Status.COMPLETED)
+    active.filter(start_date__lte=today, end_date__gte=today).exclude(status=Trip.Status.IN_PROGRESS).update(status=Trip.Status.IN_PROGRESS)

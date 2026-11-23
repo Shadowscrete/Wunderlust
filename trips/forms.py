@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 from .models import Activity, Checklist, ItineraryDay, Notification, TravelInfo, Trip
 
 
@@ -17,14 +18,24 @@ class TripForm(forms.ModelForm):
         fields = ('destination', 'country', 'airline', 'start_date', 'end_date')
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            # data-min-from keeps the return picker from going earlier than the chosen departure.
+            'end_date': forms.DateInput(attrs={'type': 'date', 'data-min-from': 'id_start_date'}),
         }
         labels = {'destination': 'City', 'country': 'Country', 'airline': 'Airline (optional)'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        today = timezone.localdate().isoformat()
+        self.fields['start_date'].widget.attrs['min'] = today
+        self.fields['end_date'].widget.attrs['min'] = today
 
     def clean(self):
         cleaned = super().clean()
         start_date = cleaned.get('start_date')
         end_date = cleaned.get('end_date')
+        # Only new trips are created through this form, so departure can't already be in the past.
+        if start_date and start_date < timezone.localdate():
+            self.add_error('start_date', 'The departure date can’t be in the past.')
         if start_date and end_date and end_date < start_date:
             self.add_error('end_date', 'The return date must be on or after the departure date.')
         if start_date and end_date and cleaned.get('generate_itinerary') and (end_date - start_date).days > 30:
@@ -76,6 +87,8 @@ class ItineraryDayForm(forms.ModelForm):
     def __init__(self, trip, *args, **kwargs):
         self.trip = trip
         super().__init__(*args, **kwargs)
+        # The picker only offers days inside the trip.
+        self.fields['date'].widget.attrs.update({'min': trip.start_date.isoformat(), 'max': trip.end_date.isoformat()})
 
     def clean_date(self):
         selected_date = self.cleaned_data['date']

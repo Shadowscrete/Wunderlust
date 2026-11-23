@@ -1,7 +1,9 @@
-from datetime import timedelta
+from django.utils.http import url_has_allowed_host_and_scheme
+from datetime import datetime, time, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q
@@ -10,6 +12,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from accounts.context_processors import get_user_prefs
+from accounts.models import Profile
+
 from .decorators import role_required
 from .forms import ActivityForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
 from .models import Activity, Checklist, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
@@ -37,6 +42,13 @@ def traveler_dashboard(request):
     checklist_items = Checklist.objects.filter(trip__in=upcoming_trips)
     documents = checklist_items.filter(is_document=True)
     packing_items = checklist_items.filter(is_document=False)
+    # One aggregate query instead of ten separate COUNT/EXISTS round-trips.
+    stats = checklist_items.aggregate(
+        document_total=Count('pk', filter=Q(is_document=True)),
+        document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
+        packing_total=Count('pk', filter=Q(is_document=False)),
+        packing_done=Count('pk', filter=Q(is_document=False, is_complete=True)),
+    )
     recent_activities = Activity.objects.filter(
         day__trip__in=trips,
         day__date__gte=timezone.localdate(),
@@ -44,25 +56,25 @@ def traveler_dashboard(request):
     group_memberships = GroupMember.objects.filter(user=request.user).select_related('group_trip__trip', 'group_trip__created_by')
     travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).distinct()[:8]
     notifications = Notification.objects.filter(
-        Q(user=request.user) | Q(user__isnull=True),
+        _notification_scope(request.user),
         created_at__date=timezone.localdate(),
     ).filter(Q(trip__in=trips) | Q(trip__isnull=True))[:8]
     return render(request, 'dashboard/traveler.html', {
         'trips': upcoming_trips[:5],
         'documents': documents,
         'packing_items': packing_items,
-        'document_total': documents.count(),
-        'document_done': documents.filter(is_complete=True).count(),
-        'document_progress': round(documents.filter(is_complete=True).count() * 100 / documents.count()) if documents.exists() else 0,
-        'packing_total': packing_items.count(),
-        'packing_done': packing_items.filter(is_complete=True).count(),
-        'packing_progress': round(packing_items.filter(is_complete=True).count() * 100 / packing_items.count()) if packing_items.exists() else 0,
+        'document_total': stats['document_total'],
+        'document_done': stats['document_done'],
+        'document_progress': round(stats['document_done'] * 100 / stats['document_total']) if stats['document_total'] else 0,
+        'packing_total': stats['packing_total'],
+        'packing_done': stats['packing_done'],
+        'packing_progress': round(stats['packing_done'] * 100 / stats['packing_total']) if stats['packing_total'] else 0,
         'activities': recent_activities,
         'group_memberships': group_memberships[:5],
         'travel_info': travel_info,
         'notifications': notifications,
         'today_notification_count': Notification.objects.filter(
-            Q(user=request.user) | Q(user__isnull=True), created_at__date=timezone.localdate(), is_read=False
+            _notification_scope(request.user), created_at__date=timezone.localdate(), is_read=False
         ).count(),
     })
 
@@ -71,13 +83,23 @@ def _accessible_trips(user):
     return Trip.objects.filter(Q(owner=user) | Q(group_trip__members__user=user)).distinct()
 
 
-def _notify_group(trip, title, message, exclude_user=None):
+def _notification_scope(user):
+    """Notifications a user should see: their own, plus system-wide notices unless they turned those off."""
+    if get_user_prefs(user)['notify_system']:
+        return Q(user=user) | Q(user__isnull=True)
+    return Q(user=user)
+
+
+def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_updates'):
     group = getattr(trip, 'group_trip', None)
     recipients = set()
     if trip.owner_id != exclude_user:
         recipients.add(trip.owner_id)
     if group:
         recipients.update(group.members.exclude(user_id=exclude_user).values_list('user_id', flat=True))
+    # Skip travelers who switched this kind of notification off in Settings.
+    if recipients:
+        recipients -= set(Profile.objects.filter(user_id__in=recipients, **{kind: False}).values_list('user_id', flat=True))
     Notification.objects.bulk_create([
         Notification(user_id=user_id, trip=trip, title=title, message=message)
         for user_id in recipients
@@ -296,7 +318,7 @@ def trip_join(request, invite_code):
     if request.method == 'POST':
         membership, created = GroupMember.objects.get_or_create(group_trip=group_trip, user=request.user)
         if created:
-            _notify_group(group_trip.trip, 'A traveler joined your group', f'{request.user.get_username()} joined {group_trip.trip.destination}.', request.user.pk)
+            _notify_group(group_trip.trip, 'A traveler joined your group', f'{request.user.get_username()} joined {group_trip.trip.destination}.', request.user.pk, kind='notify_member_joins')
             messages.success(request, f'You joined the trip to {group_trip.trip.destination}.')
         else:
             messages.info(request, 'You are already part of this trip.')
@@ -308,25 +330,41 @@ def trip_join(request, invite_code):
 def activity_list(request):
     cutoff = timezone.localdate() - timedelta(days=30)
     # Lazy cleanup keeps stale activities out even if the daily management command is not scheduled.
-    Activity.objects.filter(day__date__lt=cutoff).delete()
-    activities = Activity.objects.filter(day__trip__in=_accessible_trips(request.user), day__date__gte=cutoff).select_related('day__trip').order_by('day__date', 'start_time', 'pk')
-    page = Paginator(activities, 10).get_page(request.GET.get('page'))
-    return render(request, 'dashboard/activities.html', {'page_obj': page})
+    # cache.add only succeeds once per day, so the DELETE doesn't run on every page view.
+    if cache.add(f'activity-cleanup-{timezone.localdate()}', True, 60 * 60 * 24):
+        Activity.objects.filter(day__date__lt=cutoff).delete()
+    kind = request.GET.get('type', 'all')
+    if kind not in ('all', 'log', 'notification'):
+        kind = 'all'
 
+    entries = []
+    if kind in ('all', 'log'):
+        activities = Activity.objects.filter(
+            day__trip__in=_accessible_trips(request.user), day__date__gte=cutoff,
+        ).select_related('day__trip')
+        for activity in activities:
+            when = datetime.combine(activity.day.date, activity.start_time or time.min)
+            entries.append({'kind': 'log', 'when': when, 'has_time': bool(activity.start_time), 'item': activity})
+    if kind in ('all', 'notification'):
+        # Today's notifications live in the inbox; older ones are kept here.
+        notifications = Notification.objects.filter(
+            _notification_scope(request.user),
+            created_at__date__lt=timezone.localdate(),
+            created_at__date__gte=cutoff,
+        ).select_related('trip')
+        for notification in notifications:
+            when = timezone.localtime(notification.created_at).replace(tzinfo=None)
+            entries.append({'kind': 'notification', 'when': when, 'has_time': True, 'item': notification})
 
-@role_required(User.Role.TRAVELER)
-def notification_list(request):
-    notifications = Notification.objects.filter(
-        Q(user=request.user) | Q(user__isnull=True),
-        created_at__date=timezone.localdate(),
-    ).order_by('-created_at')
-    return render(request, 'dashboard/notifications.html', {'notifications': notifications})
+    entries.sort(key=lambda entry: entry['when'], reverse=True)
+    page = Paginator(entries, 15).get_page(request.GET.get('page'))
+    return render(request, 'dashboard/activities.html', {'page_obj': page, 'kind': kind})
 
 
 @role_required(User.Role.TRAVELER)
 def live_notification_count(request):
     day_notifications = Notification.objects.filter(
-        Q(user=request.user) | Q(user__isnull=True),
+        _notification_scope(request.user),
         created_at__date=timezone.localdate(),
     ).select_related('trip').order_by('-created_at')
     notifications = [{
@@ -353,7 +391,10 @@ def notification_mark_read(request, notification_id):
     )
     notification.is_read = True
     notification.save(update_fields=('is_read',))
-    return redirect('notification_list')
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER', '')
+    if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return redirect(next_url)
+    return redirect('activity_list')
 
 
 @role_required(User.Role.ADMINISTRATOR)

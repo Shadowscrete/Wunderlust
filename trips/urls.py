@@ -15,7 +15,6 @@ urlpatterns = [
     path('checklist/<int:item_id>/quantity/', views.checklist_quantity_update, name='checklist_quantity_update'),
     path('join/<str:invite_code>/', views.trip_join, name='trip_join'),
     path('activities/', views.activity_list, name='activity_list'),
-    path('notifications/', views.notification_list, name='notification_list'),
     path('notifications/live-count/', views.live_notification_count, name='live_notification_count'),
     path('notifications/<int:notification_id>/read/', views.notification_mark_read, name='notification_mark_read'),
 ]

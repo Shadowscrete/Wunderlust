@@ -1,0 +1,6 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Today’s notifications | Wunderlust{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">TODAY · {{ notifications|length }} UPDATES</p><h1>Notifications</h1><p class="page-subtitle">Trip reminders and updates available today.</p></div></div>
+<section class="dashboard-section notification-page-list" id="live-notification-feed" aria-live="polite" aria-relevant="additions text">{% for notification in notifications %}<article class="notification-page-row"><span class="notification-dot {% if notification.is_read %}read{% endif %}"></span><div class="notification-page-copy"><strong>{{ notification.title }}</strong><p>{{ notification.message|default:"There’s a new update for your travel space." }}</p><small>{{ notification.created_at|date:"g:i A" }}{% if notification.trip %} · {{ notification.trip.destination }}{% endif %}</small></div>{% if not notification.is_read and notification.user_id == request.user.id %}<form method="post" action="{% url 'notification_mark_read' notification.pk %}">{% csrf_token %}<button class="text-button" type="submit">Mark read</button></form>{% endif %}</article>{% empty %}<div class="empty-state"><strong>You’re all caught up.</strong><p>New trip and group updates will appear here throughout the day.</p></div>{% endfor %}</section>
+{% endblock %}

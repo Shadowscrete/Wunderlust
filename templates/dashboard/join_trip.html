@@ -1,0 +1,5 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Join a trip | Wunderlust{% endblock %}
+{% block content %}
+<section class="dashboard-section join-trip-panel"><p class="eyebrow">YOU’RE INVITED</p><h1>Join {{ group_trip.trip.destination }}{% if group_trip.trip.country %}, {{ group_trip.trip.country }}{% endif %}</h1><p>{{ group_trip.trip.start_date|date:"M j" }} – {{ group_trip.trip.end_date|date:"M j, Y" }}</p><p class="page-subtitle">Join this shared trip to see its itinerary, travel notes and preparation list.</p><form method="post">{% csrf_token %}<button class="button button-primary" type="submit">Join this trip</button><a class="back-link" href="{% url 'trip_list' %}">Cancel</a></form></section>
+{% endblock %}

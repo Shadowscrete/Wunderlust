@@ -5,10 +5,7 @@ from . import views
 urlpatterns = [
     path('register/', views.register, name='register'),
 
-    path('login/', auth_views.LoginView.as_view(
-        template_name='registration/login.html',
-        next_page='login_success',
-    ), name='login'),
+    path('login/', views.WunderlustLoginView.as_view(), name='login'),
 
     path('login-success/', views.login_success, name='login_success'),
 

@@ -1,0 +1,15 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Plan a trip | Wunderlust{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'trip_list' %}">← My trips</a>
+<div class="page-heading trip-form-heading"><div><p class="eyebrow">START WITH SOMEWHERE</p><h1>Plan a new trip</h1><p class="page-subtitle">We’ll set up your trip space, preparation list and a flexible itinerary.</p></div></div>
+<section class="dashboard-section trip-form-panel">
+    <form method="post" class="feature-form">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid">
+            {% for field in form %}<div class="form-field{% if field.name == 'places' %} full-field{% endif %}{% if field.name == 'generate_itinerary' %} full-field checkbox-field{% endif %}">{% if field.name != 'generate_itinerary' %}{{ field.label_tag }}{% endif %}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% if field.name == 'generate_itinerary' %}{{ field.label_tag }}{% endif %}</div>{% endfor %}
+        </div>
+        <div class="form-footer"><p>Four travel documents and five optional essentials will be added to your preparation checklist automatically.</p><button class="button button-primary" type="submit">Create trip <span aria-hidden="true">→</span></button></div>
+    </form>
+</section>
+{% endblock %}

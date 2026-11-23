@@ -1,28 +1,75 @@
 {% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Wunderlust</title>
-    <link rel="stylesheet" href="{% static 'home/home.css' %}">
+    <meta name="theme-color" content="#f5f3ed">
+    <meta name="description" content="Find your next somewhere with Wunderlust. Thoughtful travel starts here.">
+    <title>Wunderlust — Find your somewhere</title>
+    <link rel="icon" href="{% static 'home/assets/Wunderlust-Logo.png' %}" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=3">
 </head>
-<body>
+<body class="wunderlust-page">
     <header class="site-header">
-        <a class="brand" href="{% url 'home' %}">Wunderlust</a>
-        <nav class="auth-links" aria-label="Account">
-            <a class="login-link" href="{% url 'login' %}">Log in</a>
-            <a class="signup-link" href="{% url 'register' %}">Sign up</a>
+        <a class="brand" href="{% url 'home' %}" aria-label="Wunderlust home">Wunderlust</a>
+        <nav class="main-nav" aria-label="Main navigation">
+            <a href="#discover">Discover</a>
+            <a href="#inspiration">Inspiration</a>
+            <a href="#about">Our approach</a>
+        </nav>
+        <div class="account-nav"><a class="login-link" href="{% url 'login' %}">Log in</a><a class="signup-link" href="{% url 'register' %}">Join Wunderlust <span aria-hidden="true">&#8599;</span></a></div>
+        <button class="mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-navigation"><span></span><span></span></button>
+        <nav class="mobile-navigation" id="mobile-navigation" aria-label="Mobile navigation">
+            <a href="#discover">Discover</a><a href="#inspiration">Inspiration</a><a href="#about">Our approach</a><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Join Wunderlust</a>
         </nav>
     </header>
 
-    <main class="home-main">
-        <section class="welcome">
-            <p class="eyebrow">TRAVEL, YOUR WAY</p>
-            <h1>Welcome to<br>Wunderlust.</h1>
-            <p class="welcome-copy">Your travel adventure starts here.</p>
-            <a class="get-started" href="{% url 'register' %}">Create an account</a>
+    <main>
+        <section class="hero" aria-labelledby="hero-title">
+            <img class="hero-image" src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="A wooden boat gliding over an alpine lake toward the mountains" fetchpriority="high">
+            <div class="hero-shade" aria-hidden="true"></div>
+            <div class="hero-content">
+                <p class="hero-kicker fade-in fade-one"><span></span> TRAVEL, YOUR WAY</p>
+                <h1 id="hero-title" class="fade-in fade-two">Find your<br><em>somewhere.</em></h1>
+                <p class="hero-copy fade-in fade-three">The world is wide open. Find a place that feels like yours, then make the journey your own.</p>
+                <a class="hero-button fade-in fade-four" href="{% url 'register' %}">Start exploring <span aria-hidden="true">&#8599;</span></a>
+            </div>
+            <div class="hero-caption"><span class="caption-rule"></span> LAKE BRAIES, DOLOMITES <span class="caption-coordinates">46°41′N&nbsp; 12°05′E</span></div>
+            <a class="scroll-cue" href="#discover" aria-label="Scroll to discover travel inspiration"><span></span></a>
+        </section>
+
+        <section class="discover-section" id="discover" aria-labelledby="discover-title">
+            <div class="section-heading">
+                <div><p class="section-kicker">A little inspiration</p><h2 id="discover-title">Somewhere is<br><em>calling.</em></h2></div>
+                <p class="section-intro">A mountain morning, the long way around, a place you never expected to love. Start with the feeling and see where it takes you.</p>
+            </div>
+            <div class="inspiration-grid" id="inspiration">
+                <article class="feature feature-lake">
+                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore lake and mountain escapes">
+                        <img src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="View from a boat on a still mountain lake" loading="lazy">
+                        <span class="feature-label">FIND YOUR STILLNESS</span><span class="feature-caption"><span>Lake &amp; mountain escapes</span><span aria-hidden="true">&#8599;</span></span>
+                    </a>
+                </article>
+                <article class="feature feature-road">
+                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore journeys off the beaten path">
+                        <img src="{% static 'home/assets/roadsigns-travel.jpg' %}" width="1500" height="2250" alt="Colorful signposts pointing travelers toward places to explore" loading="lazy">
+                        <span class="feature-label">TAKE THE SCENIC ROUTE</span><span class="feature-caption"><span>Journeys off the beaten path</span><span aria-hidden="true">&#8599;</span></span>
+                    </a>
+                </article>
+            </div>
+        </section>
+
+        <section class="about-section" id="about" aria-labelledby="about-title">
+            <div class="about-copy"><p class="section-kicker">A different kind of travel</p><h2 id="about-title">Make room for<br>the <em>unexpected.</em></h2><p>Wunderlust is for the curious, the slow wanderers, and everyone who knows the best part of a trip is often the part you didn't plan. Follow what moves you. Take the turn that looks interesting. Come back with a story all your own.</p><a class="about-link" href="{% url 'register' %}">Your journey starts here <span aria-hidden="true">&#8594;</span></a></div>
+            <img class="about-image" src="{% static 'home/assets/roadsigns-travel.jpg' %}" width="1500" height="2250" alt="A cluster of colorful destination signs" loading="lazy">
         </section>
     </main>
+
+    <footer class="site-footer"><a class="brand footer-brand" href="{% url 'home' %}">Wunderlust</a><p>For the miles, moments, and memories ahead.</p><div><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Create an account</a></div><small>&copy; {% now "Y" %} Wunderlust</small></footer>
+    <script src="{% static 'home/home.js' %}?v=3" defer></script>
 </body>
 </html>

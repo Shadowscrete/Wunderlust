@@ -109,8 +109,11 @@ class ActivityForm(forms.ModelForm):
     class Meta:
         model = Activity
         fields = ('title', 'start_time', 'location', 'notes')
+        labels = {'title': 'Activity', 'start_time': 'Time (optional)', 'location': 'Place (optional)'}
         widgets = {
-            'start_time': forms.TimeInput(attrs={'type': 'time'}),
+            'title': forms.TextInput(attrs={'placeholder': 'e.g. Visit Senso-ji Temple'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time', 'title': 'Leave empty for a flexible time'}),
+            'location': forms.TextInput(attrs={'placeholder': 'e.g. Asakusa, Tokyo'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
         }
 
@@ -119,9 +122,11 @@ class ItineraryDayForm(forms.ModelForm):
     class Meta:
         model = ItineraryDay
         fields = ('date', 'title', 'notes')
+        labels = {'title': 'Day title (optional)', 'notes': 'Notes (optional)'}
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
-            'notes': forms.Textarea(attrs={'rows': 2}),
+            'title': forms.TextInput(attrs={'placeholder': 'e.g. Arrival & old town'}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Anything to remember for this day'}),
         }
 
     def __init__(self, trip, *args, **kwargs):

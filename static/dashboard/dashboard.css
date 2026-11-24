@@ -2549,3 +2549,13 @@ html{scrollbar-gutter:stable}
   .page-content{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
 @media(max-width:560px) and (prefers-reduced-motion:reduce){.sidebar{transition:opacity .15s ease}}
+
+/* Itinerary "add activity": labelled fields (Activity full width, then Time + Place) */
+.inline-add-form.activity-add-form{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px 8px;align-items:end}
+.activity-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.activity-field>span{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.activity-add-form .activity-field input{grid-column:auto;flex:none}
+.activity-field-wide{grid-column:1/-1}
+.activity-add-form>button,.activity-add-form>.field-error{grid-column:1/-1}
+.activity-add-form input::placeholder,.day-add-fields input::placeholder,.day-add-fields textarea::placeholder{color:var(--muted);opacity:.75}
+@media(max-width:420px){.inline-add-form.activity-add-form{grid-template-columns:1fr}}

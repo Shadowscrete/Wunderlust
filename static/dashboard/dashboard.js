@@ -637,3 +637,34 @@ function assertJson(response) {
     }, true);
   });
 })();
+
+(() => {
+  // Phone bottom nav: hide while scrolling down, show again on any scroll up.
+  const nav = document.querySelector('.sidebar');
+  if (!nav) return;
+  const phone = window.matchMedia('(max-width: 560px)');
+  const body = document.body;
+  let lastY = window.scrollY;
+  let ticking = false;
+
+  const update = () => {
+    ticking = false;
+    const y = Math.max(window.scrollY, 0);
+    const delta = y - lastY;
+    if (!phone.matches || y < 24) {
+      body.classList.remove('nav-hidden');       // always visible near the top
+    } else if (delta > 6) {
+      body.classList.add('nav-hidden');          // scrolling down
+    } else if (delta < -6) {
+      body.classList.remove('nav-hidden');       // scrolling up
+    }
+    if (Math.abs(delta) > 6) lastY = y;
+  };
+
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(update); }
+  }, { passive: true });
+  phone.addEventListener('change', () => body.classList.remove('nav-hidden'));
+  // Keyboard users: bring it back when focus moves into it.
+  nav.addEventListener('focusin', () => body.classList.remove('nav-hidden'));
+})();

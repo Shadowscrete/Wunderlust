@@ -2527,3 +2527,25 @@ html{scrollbar-gutter:stable}
 
 /* Home: "plan your first trip" prompt */
 .empty-state .button{margin-top:14px}
+
+/* ---- Phone: floating bottom navigation pill -------------------------------
+   Replaces the old top strip. Hides while scrolling down, returns on scroll up
+   (toggled by .nav-hidden on <body> in dashboard.js). */
+@media(max-width:560px){
+  .sidebar{position:fixed;top:auto;left:50%;right:auto;bottom:calc(14px + env(safe-area-inset-bottom));z-index:900;
+    width:auto;max-width:calc(100vw - 32px);height:auto;padding:6px;display:block;
+    background:color-mix(in srgb,var(--surface) 88%,transparent);
+    -webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);
+    border:1px solid var(--line);border-radius:999px;box-shadow:0 10px 30px rgba(20,30,22,.16);
+    transform:translate(-50%,0);transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s ease}
+  body.nav-hidden .sidebar{transform:translate(-50%,calc(100% + 24px + env(safe-area-inset-bottom)));opacity:0;pointer-events:none}
+  .sidebar .brand,.sidebar-label,.sidebar-bottom{display:none}
+  .sidebar-nav{display:flex;width:auto;flex:none;margin:0;padding:0;gap:4px;overflow:visible}
+  .sidebar-nav .nav-link{flex:1 1 0;min-width:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:3px;padding:8px 12px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.1;white-space:nowrap;text-align:center}
+  .sidebar-nav .nav-icon{font-size:0;display:grid;place-items:center}
+  .sidebar-nav .nav-icon svg{width:20px;height:20px}
+  /* Leave room so the pill never covers the end of the page. */
+  .page-content{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+}
+@media(max-width:560px) and (prefers-reduced-motion:reduce){.sidebar{transition:opacity .15s ease}}

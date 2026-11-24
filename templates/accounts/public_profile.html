@@ -20,6 +20,34 @@
     </div>
 </section>
 
+<section class="profile-stats" aria-label="Travel stats">
+    <div class="profile-stat"><strong>{{ stats.total }}</strong><span>Trips</span></div>
+    <div class="profile-stat"><strong>{{ stats.upcoming }}</strong><span>Upcoming</span></div>
+    <div class="profile-stat"><strong>{{ stats.completed }}</strong><span>Completed</span></div>
+    <div class="profile-stat"><strong>{{ stats.countries }}</strong><span>{% if stats.countries == 1 %}Country{% else %}Countries{% endif %}</span></div>
+</section>
+
+<div class="profile-grid">
+    <section class="dashboard-section profile-card">
+        <h2>About</h2>
+        <dl class="profile-details">
+            <div><dt>Full name</dt><dd>{{ person.get_full_name|default:"—" }}</dd></div>
+            <div><dt>Username</dt><dd>{{ person.get_username }}</dd></div>
+            <div><dt>Country</dt><dd>{{ person.profile.location|default:"—" }}</dd></div>
+            <div><dt>Member since</dt><dd>{{ person.date_joined|date:"F j, Y" }}</dd></div>
+        </dl>
+    </section>
+
+    <section class="dashboard-section profile-card">
+        <h2>Countries visited</h2>
+        {% if visited_countries %}
+        <ul class="visited-countries">{% for country in visited_countries %}<li class="person-badge">{{ country }}</li>{% endfor %}</ul>
+        {% else %}
+        <div class="empty-state"><strong>No countries yet.</strong><p>Finished trips will show up here.</p></div>
+        {% endif %}
+    </section>
+</div>
+
 <dialog class="modal" id="report-dialog" aria-labelledby="report-title">
     <form method="post" action="{% url 'report_user' person.get_username %}" class="modal-body">{% csrf_token %}
         <div class="modal-head"><div><h2 id="report-title">Report @{{ person.get_username }}</h2><p>Reports are private. {{ person.get_full_name|default:person.get_username }} won’t know who reported them.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>

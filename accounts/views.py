@@ -243,12 +243,29 @@ def public_profile(request, username):
     person = _discoverable_or_404(username)
     if person.pk == request.user.pk:
         return redirect('profile')
+    from django.db.models import Count, Q
+    from django.utils import timezone
+    from trips.models import Trip
+    today = timezone.localdate()
+    trip_ids = Trip.objects.filter(Q(owner=person) | Q(group_trip__members__user=person)).values('pk')
+    person_trips = Trip.objects.filter(pk__in=trip_ids)
+    # Same numbers as the owner's own profile, minus anything about who shares trips with them.
+    stats = person_trips.aggregate(
+        total=Count('pk'),
+        upcoming=Count('pk', filter=Q(end_date__gte=today) & ~Q(status=Trip.Status.CANCELLED)),
+        completed=Count('pk', filter=Q(status=Trip.Status.COMPLETED) | (Q(end_date__lt=today) & ~Q(status=Trip.Status.CANCELLED))),
+        countries=Count('country', distinct=True, filter=~Q(country='') & Q(status=Trip.Status.COMPLETED)),
+    )
+    visited_countries = list(person_trips.filter(status=Trip.Status.COMPLETED).exclude(country='')
+                             .order_by('country').values_list('country', flat=True).distinct())
     return render(request, 'accounts/public_profile.html', {
         'person': person,
         'person_avatar': avatar_url_for(person),
         'person_initials': initials_for(person),
         'person_profile': getattr(person, 'profile', None) if hasattr(person, 'profile') else None,
         'rel': relationship(request.user, person),
+        'stats': stats,
+        'visited_countries': visited_countries,
         'followers_count': Follow.objects.filter(following=person).count(),
         'following_count': Follow.objects.filter(follower=person).count(),
         'report_form': ReportForm(),

@@ -1,3 +1,35 @@
+// ---- Error feedback for background saves -------------------------------
+// A small toast so a failed save is never silent. err.message holds the HTTP status when there is one.
+const FAILURE_TEXT = {
+  '403': 'Your session expired or you don’t have access. Reload the page and try again.',
+  '404': 'That item no longer exists. Reload the page to see the latest.',
+  '503': 'We can’t reach the server right now. Please try again in a minute.',
+};
+function showErrorToast(err, fallback) {
+  const text = !navigator.onLine
+    ? 'You’re offline. Your change wasn’t saved.'
+    : FAILURE_TEXT[err && err.message] || fallback || 'Something went wrong and your change wasn’t saved. Please try again.';
+  let toast = document.getElementById('error-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'error-toast';
+    toast.className = 'error-toast';
+    toast.setAttribute('role', 'alert');
+    document.body.append(toast);
+  }
+  toast.textContent = text;
+  toast.hidden = false;
+  window.clearTimeout(showErrorToast.timer);
+  showErrorToast.timer = window.setTimeout(() => { toast.hidden = true; }, 5000);
+}
+
+// A redirect to the login page (session expired) comes back as HTML with status 200; treat it as a 403.
+function assertJson(response) {
+  if (!response.ok) throw new Error(String(response.status));
+  if (response.redirected && /\/accounts\/login\//.test(response.url)) throw new Error('403');
+  return response.json().catch(() => { throw new Error('500'); });
+}
+
 (() => {
   const body = document.body;
   const countBadge = document.getElementById('live-notification-count');
@@ -100,12 +132,13 @@
         credentials: 'same-origin',
         headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
       });
-      if (!response.ok) throw new Error(String(response.status));
+      await assertJson(response);
       const dot = row && row.querySelector('.notification-dot');
       if (dot) dot.classList.add('read');
       form.remove();
       refreshNotificationCount();
-    } catch (_) {
+    } catch (err) {
+      showErrorToast(err, 'Couldn’t mark that notification as read. Please try again.');
       delete form.dataset.busy;
     }
   }, true);
@@ -433,12 +466,12 @@
           credentials: 'same-origin',
           headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         });
-        if (!response.ok) throw new Error(String(response.status));
-        const data = await response.json();
+        const data = await assertJson(response);
         paint(form, data.is_complete);      // trust the server's answer
         updateTotals(data);
         updateTripStatus(data);
-      } catch (_) {
+      } catch (err) {
+        showErrorToast(err);
         paint(form, was);                   // revert if it didn't save
         button.classList.add('check-failed');
         window.setTimeout(() => button.classList.remove('check-failed'), 900);
@@ -593,12 +626,12 @@
       form.dataset.busy = '1';
       try {
         const r = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
-        if (!r.ok) throw new Error();
-        const data = await r.json();
+        const data = await assertJson(r);
         paint(button, data.i_follow, data.follows_me);
         const count = document.querySelector('[data-followers-count]');
         if (count && typeof data.followers_count === 'number') count.textContent = data.followers_count;
-      } catch (_) {
+      } catch (err) {
+        showErrorToast(err, 'Couldn’t update that follow. Please try again.');
         paint(button, was, followsMe);
       } finally { delete form.dataset.busy; }
     }, true);

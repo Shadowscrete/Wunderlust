@@ -85,7 +85,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # JSON errors for background requests, 503 page when the database is unreachable.
+    'config.errors.ErrorHandlingMiddleware',
 ]
+
+# Friendly "form expired" page instead of Django's bare CSRF error.
+CSRF_FAILURE_VIEW = 'config.errors.csrf_failure'
 
 ROOT_URLCONF = 'config.urls'
 

@@ -345,6 +345,15 @@ def checklist_toggle(request, item_id):
     item.is_complete = not item.is_complete
     item.save(update_fields=('is_complete',))
     _notify_group(item.trip, 'Preparation list updated', f'{item.title} was marked {"ready" if item.is_complete else "not ready"}.', request.user.pk)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Background save from the trip page: send back fresh totals instead of reloading the page.
+        totals = Checklist.objects.filter(trip_id=item.trip_id).aggregate(
+            all_count=Count('pk'),
+            all_done=Count('pk', filter=Q(is_complete=True)),
+            document_count=Count('pk', filter=Q(is_document=True)),
+            document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
+        )
+        return JsonResponse({'is_complete': item.is_complete, **totals})
     return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
 
 

@@ -350,3 +350,64 @@
     else img.addEventListener('error', () => drop(img), { once: true });
   });
 })();
+
+(() => {
+  // Checklist: tick/untick instantly and save in the background (no page reload).
+  const forms = document.querySelectorAll('form[data-checklist-toggle]');
+  if (!forms.length) return;
+  const CHECK = '<svg class="check-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const $ = (sel) => document.querySelector(sel);
+
+  const paint = (form, done) => {
+    const button = form.querySelector('.check-state');
+    const title = form.querySelector('.checklist-title');
+    const name = title ? title.textContent.trim() : 'item';
+    button.classList.toggle('is-complete', done);
+    button.innerHTML = done ? CHECK : '';
+    button.setAttribute('aria-label', `${done ? 'Mark' : 'Mark'} ${name} ${done ? 'incomplete' : 'complete'}`);
+    button.setAttribute('aria-pressed', String(done));
+    if (title) title.classList.toggle('completed-text', done);
+  };
+
+  const updateTotals = ({ all_done, all_count, document_done, document_count }) => {
+    const percent = all_count ? Math.round((all_done * 100) / all_count) : 0;
+    const set = (sel, text) => { const el = $(sel); if (el) el.textContent = text; };
+    set('[data-prep-summary]', `${all_done} of ${all_count} items ready`);
+    set('[data-prep-docs]', `${document_done} of ${document_count} required documents complete`);
+    set('[data-prep-percent]', `${percent}%`);
+    set('[data-prep-tab]', `${all_done}/${all_count}`);
+    set('[data-doc-badge]', `${document_done}/${document_count}`);
+    const bar = $('[data-prep-bar]');
+    if (bar) bar.style.width = `${percent}%`;
+  };
+
+  forms.forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();   // don't trigger the page-loading skeleton
+      if (form.dataset.busy) return;       // ignore double-clicks while saving
+      const button = form.querySelector('.check-state');
+      const was = button.classList.contains('is-complete');
+      paint(form, !was);                    // optimistic: show the change right away
+      form.dataset.busy = '1';
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const data = await response.json();
+        paint(form, data.is_complete);      // trust the server's answer
+        updateTotals(data);
+      } catch (_) {
+        paint(form, was);                   // revert if it didn't save
+        button.classList.add('check-failed');
+        window.setTimeout(() => button.classList.remove('check-failed'), 900);
+      } finally {
+        delete form.dataset.busy;
+      }
+    }, true);
+  });
+})();

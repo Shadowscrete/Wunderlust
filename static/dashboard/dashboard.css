@@ -2462,3 +2462,11 @@ html{scrollbar-gutter:stable}
 /* Profile pictures sit on top of the initials; if the image can't load, it's removed and the initials show */
 .topbar-avatar,.avatar-upload{position:relative}
 .topbar-avatar img,.avatar-upload img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
+
+/* Checklist background save */
+.check-state{transition:background .15s,border-color .15s,transform .1s}
+.check-state:active{transform:scale(.92)}
+.trip-progress-meter span,.mini-track>span{transition:width .3s ease}
+.check-state.check-failed{animation:check-shake .35s;border-color:var(--danger)}
+@keyframes check-shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+@media (prefers-reduced-motion: reduce){.check-state.check-failed{animation:none}}

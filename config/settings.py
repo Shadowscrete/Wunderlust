@@ -31,10 +31,14 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'false' if ON_VERCEL else 'true').strip().lowe
 
 # The secret key must come from the environment in production. Locally, a dev-only key is used
 # if none is set (never use this fallback anywhere public).
+# Settings must always load (Vercel reads them during the build), so missing production values are
+# collected here and reported when the site actually starts serving (see config/wsgi.py).
+MISSING_PRODUCTION_SETTINGS = []
+
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '')
 if not SECRET_KEY:
     if not DEBUG:
-        raise ImproperlyConfigured('Set the DJANGO_SECRET_KEY environment variable (Vercel > Settings > Environment Variables).')
+        MISSING_PRODUCTION_SETTINGS.append('DJANGO_SECRET_KEY')
     SECRET_KEY = 'django-insecure-local-development-only-key-do-not-use-in-production'
 
 ALLOWED_HOSTS = [
@@ -247,8 +251,10 @@ if USE_SUPABASE_STORAGE:
         },
     }
 elif ON_VERCEL:
-    raise ImproperlyConfigured('Profile pictures need Supabase Storage on Vercel: set SUPABASE_PROJECT_REF, SUPABASE_STORAGE_REGION, '
-                               'SUPABASE_STORAGE_ACCESS_KEY_ID and SUPABASE_STORAGE_SECRET_ACCESS_KEY.')
+    MISSING_PRODUCTION_SETTINGS += [name for name, value in (
+        ('SUPABASE_PROJECT_REF', SUPABASE_PROJECT_REF), ('SUPABASE_STORAGE_REGION', SUPABASE_STORAGE_REGION),
+        ('SUPABASE_STORAGE_ACCESS_KEY_ID', SUPABASE_STORAGE_ACCESS_KEY_ID),
+        ('SUPABASE_STORAGE_SECRET_ACCESS_KEY', SUPABASE_STORAGE_SECRET_ACCESS_KEY)) if not value]
 
 if not DEBUG:
     # Production hardening: cookies only over HTTPS, and browsers told to always use HTTPS.

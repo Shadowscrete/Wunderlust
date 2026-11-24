@@ -2517,3 +2517,6 @@ html{scrollbar-gutter:stable}
 /* Trip detail: status pill beside the title */
 .trip-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
 .trip-title-row h1{margin-bottom:0}
+
+/* Public profile: visited countries */
+.visited-countries{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}

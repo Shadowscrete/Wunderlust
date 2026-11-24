@@ -2458,3 +2458,7 @@ html{scrollbar-gutter:stable}
 
 /* Drawn check mark inside checklist boxes (text ✓ renders as an emoji on iPhone) */
 .check-icon{display:block;width:12px;height:12px}
+
+/* Profile pictures sit on top of the initials; if the image can't load, it's removed and the initials show */
+.topbar-avatar,.avatar-upload{position:relative}
+.topbar-avatar img,.avatar-upload img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}

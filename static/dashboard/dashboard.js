@@ -341,3 +341,12 @@
     sync(false);
   });
 })();
+
+(() => {
+  // A profile picture that fails to load (missing file, private bucket) is removed so the initials underneath show.
+  const drop = (img) => img.remove();
+  document.querySelectorAll('img[data-avatar-img]').forEach((img) => {
+    if (img.complete && img.naturalWidth === 0) drop(img);
+    else img.addEventListener('error', () => drop(img), { once: true });
+  });
+})();

@@ -44,7 +44,7 @@
                 </div>{% endif %}
                 <div class="profile-menu header-menu" data-dropdown>
                     <button class="profile-trigger" type="button" data-dropdown-trigger aria-haspopup="true" aria-expanded="false" aria-controls="profile-dropdown">
-                        <span class="topbar-avatar">{% if avatar_url %}<img src="{{ avatar_url }}" alt="">{% else %}{{ request.user.get_username|slice:":1"|upper }}{% endif %}</span>
+                        <span class="topbar-avatar">{{ request.user.get_username|slice:":1"|upper }}{% if avatar_url %}<img src="{{ avatar_url }}" alt="" data-avatar-img>{% endif %}</span>
                         <span class="profile-trigger-text"><span class="topbar-user">{{ request.user.get_full_name|default:request.user.get_username }}</span><span class="topbar-caption">{{ request.user.get_role_display }}</span></span>
                         <svg class="profile-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                     </button>

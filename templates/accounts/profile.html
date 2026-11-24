@@ -6,7 +6,7 @@
     <div class="avatar-editor">
         <form method="post" action="{% url 'update_avatar' %}" enctype="multipart/form-data" data-avatar-form>{% csrf_token %}
             <label class="profile-hero-avatar avatar-upload" title="Change profile picture">
-                {% if avatar_url %}<img src="{{ avatar_url }}" alt="">{% else %}<span>{% if user.first_name %}{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}{% else %}{{ user.get_username|slice:":1"|upper }}{% endif %}</span>{% endif %}
+                <span>{% if user.first_name %}{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}{% else %}{{ user.get_username|slice:":1"|upper }}{% endif %}</span>{% if avatar_url %}<img src="{{ avatar_url }}" alt="" data-avatar-img>{% endif %}
                 <span class="avatar-overlay" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
                 <input class="visually-hidden" type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Change profile picture">
             </label>

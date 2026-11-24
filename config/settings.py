@@ -21,14 +21,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+from django.core.exceptions import ImproperlyConfigured
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-70f4h285!)fqc7=xz=adz(v_ooidxh+jn^0nv+^h!&o#zeh7on'
+# Vercel sets VERCEL=1 on every deployment, so we know when we're running in production.
+ON_VERCEL = os.getenv('VERCEL') == '1'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG is on locally and off on Vercel. DJANGO_DEBUG=true/false overrides either way.
+DEBUG = os.getenv('DJANGO_DEBUG', 'false' if ON_VERCEL else 'true').strip().lower() in ('1', 'true', 'yes')
+
+# The secret key must come from the environment in production. Locally, a dev-only key is used
+# if none is set (never use this fallback anywhere public).
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured('Set the DJANGO_SECRET_KEY environment variable (Vercel > Settings > Environment Variables).')
+    SECRET_KEY = 'django-insecure-local-development-only-key-do-not-use-in-production'
 
 ALLOWED_HOSTS = [
     "wunderlust-six.vercel.app",
@@ -119,14 +126,29 @@ DATABASES = {
         'OPTIONS': {
             'sslmode': 'require',
         },
-        # Reuse the SSL connection to the remote database instead of reconnecting on every request.
-        'CONN_MAX_AGE': 600,
+        # Locally: reuse the SSL connection instead of reconnecting on every request.
+        # On Vercel: each short-lived function connects through Supabase's transaction pooler, so don't hold connections.
+        'CONN_MAX_AGE': 0 if ON_VERCEL else 600,
         'CONN_HEALTH_CHECKS': True,
+        # Supabase's transaction pooler (port 6543) doesn't support server-side cursors.
+        'DISABLE_SERVER_SIDE_CURSORS': ON_VERCEL,
     }
 }
 
-# Sessions are read from memory first and only fall back to the database, saving a round-trip per request.
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+if ON_VERCEL:
+    # Vercel runs many separate instances, so per-instance memory can't hold shared state:
+    # a sign-out or settings change on one instance would be invisible to the others.
+    # The cache lives in the database (table created by migration accounts/0008), and sessions are DB-only.
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            'LOCATION': 'wunderlust_cache',
+        }
+    }
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+else:
+    # Locally: sessions are read from memory first and only fall back to the database, saving a round-trip.
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
 
 # Password validation
@@ -180,3 +202,49 @@ LOGOUT_REDIRECT_URL = 'home'
 # Uploaded files (profile pictures).
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Supabase Storage (S3-compatible) for uploads. Used whenever the SUPABASE_STORAGE_* variables are set,
+# which is required on Vercel because its disk is temporary. Without them, uploads go to MEDIA_ROOT locally.
+SUPABASE_PROJECT_REF = os.getenv('SUPABASE_PROJECT_REF', '')
+SUPABASE_STORAGE_BUCKET = os.getenv('SUPABASE_STORAGE_BUCKET', 'avatars')
+SUPABASE_STORAGE_REGION = os.getenv('SUPABASE_STORAGE_REGION', '')
+SUPABASE_STORAGE_ACCESS_KEY_ID = os.getenv('SUPABASE_STORAGE_ACCESS_KEY_ID', '')
+SUPABASE_STORAGE_SECRET_ACCESS_KEY = os.getenv('SUPABASE_STORAGE_SECRET_ACCESS_KEY', '')
+USE_SUPABASE_STORAGE = all((SUPABASE_PROJECT_REF, SUPABASE_STORAGE_REGION, SUPABASE_STORAGE_ACCESS_KEY_ID, SUPABASE_STORAGE_SECRET_ACCESS_KEY))
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
+if USE_SUPABASE_STORAGE:
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            # Shown in Supabase → Storage → S3 Connection; override with SUPABASE_STORAGE_ENDPOINT if it differs.
+            'endpoint_url': os.getenv('SUPABASE_STORAGE_ENDPOINT') or f'https://{SUPABASE_PROJECT_REF}.supabase.co/storage/v1/s3',
+            'region_name': SUPABASE_STORAGE_REGION,
+            'access_key': SUPABASE_STORAGE_ACCESS_KEY_ID,
+            'secret_key': SUPABASE_STORAGE_SECRET_ACCESS_KEY,
+            'bucket_name': SUPABASE_STORAGE_BUCKET,
+            # The bucket is public, so links are plain public URLs (no expiring signatures).
+            'custom_domain': f'{SUPABASE_PROJECT_REF}.supabase.co/storage/v1/object/public/{SUPABASE_STORAGE_BUCKET}',
+            'querystring_auth': False,
+            'file_overwrite': False,
+            'default_acl': None,
+            'signature_version': 's3v4',
+            'addressing_style': 'path',
+            'object_parameters': {'CacheControl': 'public, max-age=31536000, immutable'},
+        },
+    }
+elif ON_VERCEL:
+    raise ImproperlyConfigured('Profile pictures need Supabase Storage on Vercel: set SUPABASE_PROJECT_REF, SUPABASE_STORAGE_REGION, '
+                               'SUPABASE_STORAGE_ACCESS_KEY_ID and SUPABASE_STORAGE_SECRET_ACCESS_KEY.')
+
+if not DEBUG:
+    # Production hardening: cookies only over HTTPS, and browsers told to always use HTTPS.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'

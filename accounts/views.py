@@ -159,7 +159,7 @@ def _delete_file(storage, name):
     # A missing or briefly locked file (common on Windows) shouldn't break the request.
     try:
         storage.delete(name)
-    except OSError:
+    except Exception:  # local disk (OSError) or cloud storage (network/API errors)
         pass
 
 

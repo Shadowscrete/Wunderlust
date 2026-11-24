@@ -57,6 +57,7 @@ def traveler_dashboard(request):
     travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).distinct()[:8]
     return render(request, 'dashboard/traveler.html', {
         'trips': upcoming_trips[:5],
+        'has_any_trips': trips.exists(),
         'documents': documents,
         'packing_items': packing_items,
         'document_total': stats['document_total'],

@@ -2524,3 +2524,6 @@ html{scrollbar-gutter:stable}
 /* Error toast for failed background saves */
 .error-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1000;max-width:min(440px,calc(100vw - 32px));padding:12px 18px;border-radius:12px;background:var(--danger,#b3412f);color:#fff;font-size:14px;font-weight:500;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .error-toast[hidden]{display:none}
+
+/* Home: "plan your first trip" prompt */
+.empty-state .button{margin-top:14px}

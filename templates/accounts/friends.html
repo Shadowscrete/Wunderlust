@@ -1,0 +1,19 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Friends | Wunderlust{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h1>Friends</h1><p class="page-subtitle">When you and another traveler follow each other, you become friends.</p></div><button class="button button-secondary" type="button" data-open-search>Find travelers</button></div>
+<nav class="trip-tabs" role="tablist" aria-label="Friends sections" data-tabs data-active-tab="{{ active_tab }}">
+    <button class="trip-tab" type="button" role="tab" id="tab-friends" aria-controls="panel-friends" data-tab="friends">Friends <span class="trip-tab-count">{{ friend_rows|length }}</span></button>
+    <button class="trip-tab" type="button" role="tab" id="tab-followers" aria-controls="panel-followers" data-tab="followers">Followers <span class="trip-tab-count">{{ follower_rows|length }}</span></button>
+    <button class="trip-tab" type="button" role="tab" id="tab-following" aria-controls="panel-following" data-tab="following">Following <span class="trip-tab-count">{{ following_rows|length }}</span></button>
+</nav>
+<div class="trip-panel" role="tabpanel" id="panel-friends" aria-labelledby="tab-friends" data-panel="friends">
+    <section class="dashboard-section people-list">{% for row in friend_rows %}{% include 'accounts/_user_row.html' %}{% empty %}<div class="empty-state"><strong>No friends yet.</strong><p>Follow travelers you know. When they follow you back, they’ll appear here.</p></div>{% endfor %}</section>
+</div>
+<div class="trip-panel" role="tabpanel" id="panel-followers" aria-labelledby="tab-followers" data-panel="followers" hidden>
+    <section class="dashboard-section people-list">{% for row in follower_rows %}{% include 'accounts/_user_row.html' %}{% empty %}<div class="empty-state"><strong>No followers yet.</strong><p>When someone follows you, they’ll show up here.</p></div>{% endfor %}</section>
+</div>
+<div class="trip-panel" role="tabpanel" id="panel-following" aria-labelledby="tab-following" data-panel="following" hidden>
+    <section class="dashboard-section people-list">{% for row in following_rows %}{% include 'accounts/_user_row.html' %}{% empty %}<div class="empty-state"><strong>You’re not following anyone yet.</strong><p>Use the search button at the top to find travelers.</p></div>{% endfor %}</section>
+</div>
+{% endblock %}

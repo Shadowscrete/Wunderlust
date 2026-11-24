@@ -12,8 +12,9 @@ from django.views.decorators.http import require_POST
 
 from .context_processors import clear_user_prefs
 from .sessions import active_devices, end_session, sign_out_other_sessions
-from .models import UserSession
-from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, RegisterForm
+from .models import Follow, Report, UserSession
+from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, RegisterForm, ReportForm
+from .social import avatar_url_for, connection_sets, discoverable_users, initials_for, notify_follow, relationship
 from .models import Profile
 
 logger = logging.getLogger(__name__)
@@ -196,3 +197,125 @@ def update_avatar(request):
             messages.error(request, form.errors['avatar'][0])
     clear_user_prefs(request.user.pk)
     return redirect('profile')
+
+
+
+# ======================= Social: search, profiles, follow, report, friends =======================
+from django.db import IntegrityError, transaction  # noqa: E402
+from django.db.models import Q  # noqa: E402
+from django.http import JsonResponse  # noqa: E402
+from django.shortcuts import get_object_or_404  # noqa: E402
+
+from trips.decorators import role_required  # noqa: E402
+from .models import User  # noqa: E402
+
+TRAVELER = User.Role.TRAVELER
+
+
+@role_required(TRAVELER)
+def user_search(request):
+    """Live search for the header: up to 8 travelers matching every word typed."""
+    query = ' '.join(request.GET.get('q', '').split())[:60]
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+    people = discoverable_users().exclude(pk=request.user.pk)
+    for term in query.split():
+        people = people.filter(Q(username__icontains=term) | Q(first_name__icontains=term) | Q(last_name__icontains=term))
+    people = list(people.select_related('profile').order_by('username')[:8])
+    following, followers = connection_sets(request.user)
+    return JsonResponse({'results': [{
+        'username': person.get_username(),
+        'name': person.get_full_name(),
+        'initials': initials_for(person),
+        'avatar_url': avatar_url_for(person),
+        'url': reverse('public_profile', kwargs={'username': person.get_username()}),
+        'is_friend': person.pk in following and person.pk in followers,
+        'follows_you': person.pk in followers and person.pk not in following,
+    } for person in people]})
+
+
+def _discoverable_or_404(username):
+    return get_object_or_404(discoverable_users().select_related('profile'), username__iexact=username)
+
+
+@role_required(TRAVELER)
+def public_profile(request, username):
+    person = _discoverable_or_404(username)
+    if person.pk == request.user.pk:
+        return redirect('profile')
+    return render(request, 'accounts/public_profile.html', {
+        'person': person,
+        'person_avatar': avatar_url_for(person),
+        'person_initials': initials_for(person),
+        'person_profile': getattr(person, 'profile', None) if hasattr(person, 'profile') else None,
+        'rel': relationship(request.user, person),
+        'followers_count': Follow.objects.filter(following=person).count(),
+        'following_count': Follow.objects.filter(follower=person).count(),
+        'report_form': ReportForm(),
+    })
+
+
+@role_required(TRAVELER)
+@require_POST
+def follow_toggle(request, username):
+    person = _discoverable_or_404(username)
+    if person.pk == request.user.pk:
+        return JsonResponse({'error': 'You can’t follow yourself.'}, status=400)
+    existing = Follow.objects.filter(follower=request.user, following=person)
+    if existing.exists():
+        existing.delete()
+    else:
+        try:
+            with transaction.atomic():
+                Follow.objects.create(follower=request.user, following=person)
+        except IntegrityError:
+            pass  # a double-click already created it
+        else:
+            follows_me = Follow.objects.filter(follower=person, following=request.user).exists()
+            notify_follow(request.user, person, became_friends=follows_me)
+    rel = relationship(request.user, person)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({**rel, 'followers_count': Follow.objects.filter(following=person).count()})
+    return redirect('public_profile', username=person.get_username())
+
+
+@role_required(TRAVELER)
+@require_POST
+def report_user(request, username):
+    person = _discoverable_or_404(username)
+    if person.pk == request.user.pk:
+        return redirect('profile')
+    form = ReportForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, 'Choose a reason for the report.')
+    elif Report.objects.filter(reporter=request.user, reported_user=person, status=Report.Status.OPEN).exists():
+        messages.info(request, 'You’ve already reported this traveler. Our team will review it.')
+    else:
+        report = form.save(commit=False)
+        report.reporter, report.reported_user = request.user, person
+        report.save()
+        messages.success(request, 'Thanks for letting us know. Our team will review this report.')
+    return redirect('public_profile', username=person.get_username())
+
+
+@role_required(TRAVELER)
+def friends(request):
+    following, followers = connection_sets(request.user)
+    friend_ids = following & followers
+    people = {p.pk: p for p in User.objects.filter(pk__in=following | followers).select_related('profile')}
+
+    def rows(ids):
+        out = []
+        for pk in ids:
+            person = people.get(pk)
+            if person is None or not person.is_active or person.role != TRAVELER:
+                continue
+            out.append({'user': person, 'avatar_url': avatar_url_for(person), 'initials': initials_for(person),
+                        'i_follow': pk in following, 'follows_me': pk in followers, 'is_friend': pk in friend_ids})
+        return sorted(out, key=lambda r: (r['user'].get_full_name() or r['user'].get_username()).lower())
+
+    friend_rows, follower_rows, following_rows = rows(friend_ids), rows(followers), rows(following)
+    return render(request, 'accounts/friends.html', {
+        'friend_rows': friend_rows, 'follower_rows': follower_rows, 'following_rows': following_rows,
+        'active_tab': request.GET.get('tab', 'friends'),
+    })

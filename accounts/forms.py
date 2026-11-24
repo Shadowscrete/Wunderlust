@@ -6,7 +6,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 
 from .countries import COUNTRY_CHOICES
-from .models import Profile
+from .models import Profile, Report
 
 User = get_user_model()
 
@@ -139,9 +139,21 @@ class AppearanceForm(forms.ModelForm):
 class NotificationPrefsForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ('notify_trip_updates', 'notify_member_joins', 'notify_system')
+        fields = ('notify_trip_updates', 'notify_member_joins', 'notify_new_followers', 'notify_system')
         help_texts = {
             'notify_trip_updates': 'When someone changes the itinerary, checklist or travel info on a trip you share.',
             'notify_member_joins': 'When a traveler joins one of your group trips.',
+            'notify_new_followers': 'When someone follows you, or you become friends.',
             'notify_system': 'Announcements and travel notices from the Wunderlust team.',
         }
+
+
+class ReportForm(forms.ModelForm):
+    class Meta:
+        model = Report
+        fields = ('reason', 'details')
+        widgets = {
+            'reason': forms.RadioSelect,
+            'details': forms.Textarea(attrs={'rows': 3, 'maxlength': 1000, 'placeholder': 'Anything that helps us understand (optional)'}),
+        }
+        labels = {'reason': 'Why are you reporting this traveler?', 'details': 'Details'}

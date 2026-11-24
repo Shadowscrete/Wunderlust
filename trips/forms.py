@@ -91,10 +91,18 @@ class CustomChecklistForm(forms.ModelForm):
 
 
 class ChecklistQuantityForm(forms.ModelForm):
+    MAX_QUANTITY = 999
+
     class Meta:
         model = Checklist
         fields = ('quantity',)
-        widgets = {'quantity': forms.NumberInput(attrs={'min': 1, 'step': 1})}
+        widgets = {'quantity': forms.NumberInput(attrs={'min': 1, 'max': 999, 'step': 1})}
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data['quantity']
+        if not 1 <= quantity <= self.MAX_QUANTITY:
+            raise forms.ValidationError(f'Enter an amount from 1 to {self.MAX_QUANTITY}.')
+        return quantity
 
 
 class ActivityForm(forms.ModelForm):

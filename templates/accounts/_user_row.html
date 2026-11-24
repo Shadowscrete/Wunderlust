@@ -1,0 +1,11 @@
+{# One person in a list: avatar, name, connection badges and a follow button. Expects `row`. #}
+{% with person=row.user %}
+<article class="person-row">
+    <a class="person-link" href="{% url 'public_profile' person.get_username %}">
+        <span class="person-avatar"><span>{{ row.initials }}</span>{% if row.avatar_url %}<img src="{{ row.avatar_url }}" alt="" data-avatar-img>{% endif %}</span>
+        <span class="person-copy"><strong>{{ person.get_full_name|default:person.get_username }}</strong><small>@{{ person.get_username }}</small></span>
+    </a>
+    {% if row.is_friend %}<span class="person-badge friend">Friends</span>{% elif row.follows_me %}<span class="person-badge">Follows you</span>{% endif %}
+    {% include 'accounts/_follow_button.html' with username=person.get_username i_follow=row.i_follow follows_me=row.follows_me is_friend=row.is_friend %}
+</article>
+{% endwith %}

@@ -361,12 +361,19 @@ def checklist_toggle(request, item_id):
 @require_POST
 def checklist_quantity_update(request, item_id):
     item = get_object_or_404(Checklist.objects.select_related('trip'), pk=item_id, trip__in=_accessible_trips(request.user), is_document=False)
+    previous = item.quantity
     form = ChecklistQuantityForm(request.POST, instance=item)
+    is_background = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if form.is_valid():
         form.save()
+        if is_background:
+            return JsonResponse({'quantity': item.quantity})
         messages.success(request, f'Amount updated for {item.title}.')
     else:
-        messages.error(request, 'Enter an amount of one or more.')
+        error = 'Enter an amount from 1 to 999.'  # one clear message for every invalid amount
+        if is_background:
+            return JsonResponse({'error': error, 'quantity': previous}, status=400)
+        messages.error(request, error)
     return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
 
 

@@ -1,0 +1,31 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ person.get_full_name|default:person.get_username }} | Wunderlust{% endblock %}
+{% block content %}
+<section class="profile-hero public-hero">
+    <div class="profile-hero-avatar person-avatar-lg"><span>{{ person_initials }}</span>{% if person_avatar %}<img src="{{ person_avatar }}" alt="" data-avatar-img>{% endif %}</div>
+    <div class="profile-hero-copy">
+        <p class="eyebrow">TRAVELER</p>
+        <h1>{{ person.get_full_name|default:person.get_username }}</h1>
+        <p class="profile-hero-meta">@{{ person.get_username }}<span>·</span>Member since {{ person.date_joined|date:"F Y" }}{% if rel.is_friend %}<span>·</span><strong class="person-badge friend">Friends</strong>{% elif rel.follows_me %}<span>·</span><strong class="person-badge">Follows you</strong>{% endif %}</p>
+        {% if person.profile.bio %}<p class="profile-bio">{{ person.profile.bio }}</p>{% endif %}
+        <ul class="public-stats">
+            <li><strong data-followers-count>{{ followers_count }}</strong> follower{{ followers_count|pluralize }}</li>
+            <li><strong>{{ following_count }}</strong> following</li>
+            {% if person.profile.location %}<li>{{ person.profile.location }}</li>{% endif %}
+        </ul>
+    </div>
+    <div class="public-actions">
+        {% include 'accounts/_follow_button.html' with username=person.get_username i_follow=rel.i_follow follows_me=rel.follows_me is_friend=rel.is_friend %}
+        <button class="text-button report-link" type="button" data-dialog-open="report-dialog">Report</button>
+    </div>
+</section>
+
+<dialog class="modal" id="report-dialog" aria-labelledby="report-title">
+    <form method="post" action="{% url 'report_user' person.get_username %}" class="modal-body">{% csrf_token %}
+        <div class="modal-head"><div><h2 id="report-title">Report @{{ person.get_username }}</h2><p>Reports are private. {{ person.get_full_name|default:person.get_username }} won’t know who reported them.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
+        <fieldset class="report-reasons"><legend>{{ report_form.reason.label }}</legend>{% for radio in report_form.reason %}<label class="report-reason">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}</fieldset>
+        <div class="form-field">{{ report_form.details.label_tag }}{{ report_form.details }}</div>
+        <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-danger" type="submit">Send report</button></div>
+    </form>
+</dialog>
+{% endblock %}

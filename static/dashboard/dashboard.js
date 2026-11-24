@@ -235,6 +235,8 @@
     [/^\/accounts\/profile\//, 'profile'],
     [/^\/accounts\/settings\/$/, 'settings'],
     [/^\/accounts\/support\/$/, 'support'],
+    [/^\/accounts\/friends\/$/, 'list'],
+    [/^\/accounts\/u\/[^/]+\/$/, 'profile'],
   ];
   const skeletonFor = (pathname) => (routes.find(([pattern]) => pattern.test(pathname)) || [null, 'list'])[1];
   const render = (pathname) => {
@@ -408,6 +410,162 @@
       } finally {
         delete form.dataset.busy;
       }
+    }, true);
+  });
+})();
+
+(() => {
+  // Essentials amounts: save in the background (auto-save after a short pause, or Enter / Update).
+  document.querySelectorAll('form[data-quantity-form]').forEach((form) => {
+    const input = form.querySelector('input[name="quantity"]');
+    const status = form.querySelector('[data-quantity-status]');
+    if (!input) return;
+    let saved = input.value;
+    let timer = null;
+    let controller = null;
+    let statusTimer = null;
+
+    const show = (text, kind) => {
+      if (!status) return;
+      window.clearTimeout(statusTimer);
+      status.textContent = text;
+      status.dataset.kind = kind || '';
+      if (kind === 'ok') statusTimer = window.setTimeout(() => { status.textContent = ''; }, 1600);
+    };
+
+    const save = async () => {
+      window.clearTimeout(timer);
+      const value = input.value.trim();
+      if (value === saved) return;
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 1 || n > 999) {
+        show('Use 1–999', 'error');
+        return;
+      }
+      if (controller) controller.abort();          // only the latest value matters
+      controller = new AbortController();
+      show('Saving…', 'busy');
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Couldn’t save');
+        saved = String(data.quantity);
+        if (input.value.trim() === value) input.value = saved;
+        show('Saved', 'ok');
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        input.value = saved;                         // put back the last saved amount
+        show(error.message === 'Failed to fetch' ? 'Offline — not saved' : error.message, 'error');
+      }
+    };
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();             // no page-loading skeleton
+      save();
+    }, true);
+    input.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(save, 700);          // auto-save once typing/stepping pauses
+    });
+    input.addEventListener('blur', save);
+  });
+})();
+
+(() => {
+  // Header search: live results while typing.
+  const input = document.querySelector('[data-user-search]');
+  if (!input) return;
+  const results = document.querySelector('[data-user-search-results]');
+  const menu = input.closest('[data-search-menu]');
+  const trigger = menu.querySelector('[data-dropdown-trigger]');
+  let timer = null, controller = null, active = -1;
+
+  const hint = (text) => { results.innerHTML = ''; const p = document.createElement('p'); p.className = 'search-hint'; p.textContent = text; results.append(p); };
+  const items = () => [...results.querySelectorAll('.search-result')];
+  const highlight = (i) => { items().forEach((el, n) => el.classList.toggle('is-active', n === i)); active = i; };
+
+  const render = (people) => {
+    results.innerHTML = '';
+    if (!people.length) { hint('No travelers found.'); return; }
+    people.forEach((p) => {
+      const a = document.createElement('a'); a.className = 'search-result'; a.href = p.url; a.setAttribute('role', 'option');
+      const av = document.createElement('span'); av.className = 'person-avatar';
+      const ini = document.createElement('span'); ini.textContent = p.initials; av.append(ini);
+      if (p.avatar_url) { const img = document.createElement('img'); img.src = p.avatar_url; img.alt = ''; img.addEventListener('error', () => img.remove(), { once: true }); av.append(img); }
+      const copy = document.createElement('span'); copy.className = 'person-copy';
+      const name = document.createElement('strong'); name.textContent = p.name || p.username;
+      const handle = document.createElement('small'); handle.textContent = `@${p.username}`;
+      copy.append(name, handle); a.append(av, copy);
+      if (p.is_friend || p.follows_you) { const b = document.createElement('span'); b.className = `person-badge${p.is_friend ? ' friend' : ''}`; b.textContent = p.is_friend ? 'Friends' : 'Follows you'; a.append(b); }
+      results.append(a);
+    });
+    active = -1;
+  };
+
+  const search = async () => {
+    const q = input.value.trim();
+    if (q.length < 2) { hint('Type at least 2 characters.'); return; }
+    if (controller) controller.abort();
+    controller = new AbortController();
+    hint('Searching…');
+    try {
+      const r = await fetch(`${input.dataset.endpoint}?q=${encodeURIComponent(q)}`, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: controller.signal });
+      if (!r.ok) throw new Error();
+      render((await r.json()).results || []);
+    } catch (e) { if (e.name !== 'AbortError') hint('Search isn’t available right now.'); }
+  };
+
+  input.addEventListener('input', () => { window.clearTimeout(timer); timer = window.setTimeout(search, 250); });
+  input.addEventListener('keydown', (e) => {
+    const list = items();
+    if (e.key === 'ArrowDown' && list.length) { e.preventDefault(); highlight((active + 1) % list.length); }
+    else if (e.key === 'ArrowUp' && list.length) { e.preventDefault(); highlight((active - 1 + list.length) % list.length); }
+    else if (e.key === 'Enter') { const target = list[active] || list[0]; if (target) { e.preventDefault(); target.click(); } }
+  });
+  trigger.addEventListener('click', () => window.setTimeout(() => { if (trigger.getAttribute('aria-expanded') === 'true') input.focus(); }, 0));
+  document.querySelectorAll('[data-open-search]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); trigger.click(); }));
+})();
+
+(() => {
+  // Follow / unfollow without reloading. Same form works without JavaScript (falls back to a page load).
+  const label = (following, followsMe) => (following && followsMe ? 'Friends' : following ? 'Following' : followsMe ? 'Follow back' : 'Follow');
+  const paint = (button, following, followsMe) => {
+    button.dataset.following = String(following);
+    button.dataset.followsMe = String(followsMe);
+    button.classList.toggle('is-following', following);
+    button.classList.toggle('button-primary', !following);
+    button.textContent = label(following, followsMe);
+  };
+  document.querySelectorAll('form[data-follow-form]').forEach((form) => {
+    const button = form.querySelector('.follow-button');
+    // Hovering a "Following"/"Friends" button previews the action.
+    button.addEventListener('mouseenter', () => { if (button.dataset.following === 'true') button.textContent = 'Unfollow'; });
+    button.addEventListener('mouseleave', () => paint(button, button.dataset.following === 'true', button.dataset.followsMe === 'true'));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (form.dataset.busy) return;
+      const was = button.dataset.following === 'true';
+      const followsMe = button.dataset.followsMe === 'true';
+      paint(button, !was, followsMe);
+      form.dataset.busy = '1';
+      try {
+        const r = await fetch(form.action, { method: 'POST', body: new FormData(form), credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        paint(button, data.i_follow, data.follows_me);
+        const count = document.querySelector('[data-followers-count]');
+        if (count && typeof data.followers_count === 'number') count.textContent = data.followers_count;
+      } catch (_) {
+        paint(button, was, followsMe);
+      } finally { delete form.dataset.busy; }
     }, true);
   });
 })();

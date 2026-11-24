@@ -66,6 +66,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Serves /static/ files in production (Vercel), where Django's debug static serving is off.
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -96,6 +98,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Serve straight from STATICFILES_DIRS, so no collectstatic build step is needed on Vercel.
+WHITENOISE_USE_FINDERS = True
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]

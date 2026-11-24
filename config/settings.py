@@ -218,6 +218,8 @@ STORAGES = {
     'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
 }
 if USE_SUPABASE_STORAGE:
+    from botocore.config import Config as BotoConfig
+
     STORAGES['default'] = {
         'BACKEND': 'storages.backends.s3.S3Storage',
         'OPTIONS': {
@@ -232,8 +234,15 @@ if USE_SUPABASE_STORAGE:
             'querystring_auth': False,
             'file_overwrite': False,
             'default_acl': None,
-            'signature_version': 's3v4',
-            'addressing_style': 'path',
+            # boto3 1.36+ adds integrity checksums to every request by default; Supabase's S3 API rejects them.
+            # Only send/verify checksums when an operation strictly requires it.
+            'client_config': BotoConfig(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+                request_checksum_calculation='when_required',
+                response_checksum_validation='when_required',
+                retries={'max_attempts': 3, 'mode': 'standard'},
+            ),
             'object_parameters': {'CacheControl': 'public, max-age=31536000, immutable'},
         },
     }
@@ -249,3 +258,11 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = 'same-origin'
+
+# Send warnings and errors to the console, which Vercel shows under Logs.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+}

@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib import messages
@@ -13,6 +15,8 @@ from .sessions import active_devices, end_session, sign_out_other_sessions
 from .models import UserSession
 from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, RegisterForm
 from .models import Profile
+
+logger = logging.getLogger(__name__)
 
 
 class WunderlustLoginView(LoginView):
@@ -177,7 +181,13 @@ def update_avatar(request):
         form = AvatarForm(request.POST, request.FILES)
         if form.is_valid():
             old = profile.avatar.name if profile.avatar else None
-            profile.avatar.save('avatar.jpg', form.processed_file(), save=False)
+            try:
+                profile.avatar.save('avatar.jpg', form.processed_file(), save=False)
+            except Exception:
+                # Storage unreachable or misconfigured: keep the old picture, tell the user, log details for Vercel.
+                logger.exception('Profile picture upload failed for user %s', request.user.pk)
+                messages.error(request, 'We couldn’t save your picture right now. Please try again in a moment.')
+                return redirect('profile')
             profile.save(update_fields=['avatar'])
             if old:
                 _delete_file(profile.avatar.storage, old)

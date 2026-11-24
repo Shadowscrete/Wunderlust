@@ -32,9 +32,20 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     "wunderlust-six.vercel.app",
+    ".vercel.app",  # Vercel preview deployments (each push gets its own *.vercel.app address)
     "localhost",
     "127.0.0.1",
 ]
+
+# Forms (login, sign-up, every POST) are only accepted from these HTTPS origins.
+CSRF_TRUSTED_ORIGINS = [
+    "https://wunderlust-six.vercel.app",
+    "https://*.vercel.app",
+]
+
+# Vercel terminates HTTPS and forwards requests to Django over HTTP. This header tells Django the
+# original request was HTTPS, so request.is_secure() is correct and CSRF origin checks pass.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 #User Authentication Model

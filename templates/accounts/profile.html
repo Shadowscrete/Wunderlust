@@ -47,7 +47,7 @@
 
     {% if stats %}
     <section class="dashboard-section profile-card">
-        <div class="profile-card-head"><h2>Coming up</h2><a href="{% url 'trip_list' %}">All trips →</a></div>
+        <div class="profile-card-head"><h2>Coming up</h2><a href="{% url 'trip_list' %}">All trips →︎</a></div>
         {% for trip in upcoming_trips %}
             <a class="profile-trip" href="{% url 'trip_detail' trip.pk %}">
                 <span class="trip-monogram">{{ trip.destination|slice:":2"|upper }}</span>

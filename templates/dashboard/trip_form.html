@@ -1,7 +1,7 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}{% if editing %}Edit trip{% else %}Plan a trip{% endif %} | Wunderlust{% endblock %}
 {% block content %}
-{% if editing %}<a class="back-link" href="{% url 'trip_detail' trip.pk %}">← {{ trip.destination }}</a>{% else %}<a class="back-link" href="{% url 'trip_list' %}">← My trips</a>{% endif %}
+{% if editing %}<a class="back-link" href="{% url 'trip_detail' trip.pk %}">←︎ {{ trip.destination }}</a>{% else %}<a class="back-link" href="{% url 'trip_list' %}">←︎ My trips</a>{% endif %}
 <div class="page-heading trip-form-heading"><div>{% if editing %}<p class="eyebrow">TRIP SETTINGS</p><h1>Edit trip</h1><p class="page-subtitle">Update where you’re going, when, and how it’s going.</p>{% else %}<p class="eyebrow">START WITH SOMEWHERE</p><h1>Plan a new trip</h1><p class="page-subtitle">We’ll set up your trip space, preparation list and a flexible itinerary.</p>{% endif %}</div></div>
 <section class="dashboard-section trip-form-panel">
     <form method="post" class="feature-form">{% csrf_token %}
@@ -9,7 +9,7 @@
         <div class="form-grid">
             {% for field in form %}<div class="form-field{% if field.name == 'places' %} full-field{% endif %}{% if field.name == 'generate_itinerary' %} full-field checkbox-field{% endif %}">{% if field.name != 'generate_itinerary' %}{{ field.label_tag }}{% endif %}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% if field.name == 'generate_itinerary' %}{{ field.label_tag }}{% endif %}</div>{% endfor %}
         </div>
-        {% if editing %}<div class="form-footer"><a class="button button-secondary" href="{% url 'trip_detail' trip.pk %}">Cancel</a><button class="button button-primary" type="submit">Save changes</button></div>{% else %}<div class="form-footer"><p>Four travel documents and five optional essentials will be added to your preparation checklist automatically.</p><button class="button button-primary" type="submit">Create trip <span aria-hidden="true">→</span></button></div>{% endif %}
+        {% if editing %}<div class="form-footer"><a class="button button-secondary" href="{% url 'trip_detail' trip.pk %}">Cancel</a><button class="button button-primary" type="submit">Save changes</button></div>{% else %}<div class="form-footer"><p>Four travel documents and five optional essentials will be added to your preparation checklist automatically.</p><button class="button button-primary" type="submit">Create trip <span aria-hidden="true">→︎</span></button></div>{% endif %}
     </form>
 </section>
 {% endblock %}

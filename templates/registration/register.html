@@ -24,7 +24,7 @@
             <span class="auth-image-caption">SOMEWHERE ON THE COAST</span>
         </section>
         <section class="auth-panel" aria-labelledby="auth-title">
-            <div class="auth-panel-top"><a class="auth-wordmark" href="{% url 'home' %}">Wunderlust</a><a class="back-home" href="{% url 'home' %}"><span aria-hidden="true">&#8592;</span> Back to home</a></div>
+            <div class="auth-panel-top"><a class="auth-wordmark" href="{% url 'home' %}">Wunderlust</a><a class="back-home" href="{% url 'home' %}"><span aria-hidden="true">&#8592;&#xFE0E;</span> Back to home</a></div>
             <div class="auth-content auth-content-register">
                 <p class="auth-eyebrow">A NEW ADVENTURE AWAITS</p>
                 <h1 id="auth-title">Create your account</h1>
@@ -41,7 +41,7 @@
                         </div>
                     {% endfor %}
                     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-                    <button class="submit-button" type="submit">Create account <span aria-hidden="true">&#8599;</span></button>
+                    <button class="submit-button" type="submit">Create account <span aria-hidden="true">&#8599;&#xFE0E;</span></button>
                 </form>
                 <p class="switch-link">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
             </div>

@@ -30,7 +30,11 @@ SECRET_KEY = 'django-insecure-70f4h285!)fqc7=xz=adz(v_ooidxh+jn^0nv+^h!&o#zeh7on
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "wunderlust-six.vercel.app",
+    "localhost",
+    "127.0.0.1",
+]
 
 
 #User Authentication Model

@@ -85,7 +85,8 @@ def profile(request):
             total=Count('pk'),
             upcoming=Count('pk', filter=Q(end_date__gte=today) & ~Q(status=Trip.Status.CANCELLED)),
             completed=Count('pk', filter=Q(status=Trip.Status.COMPLETED) | (Q(end_date__lt=today) & ~Q(status=Trip.Status.CANCELLED))),
-            countries=Count('country', distinct=True, filter=~Q(country='')),
+            # Only finished trips count as visited.
+            countries=Count('country', distinct=True, filter=~Q(country='') & Q(status=Trip.Status.COMPLETED)),
             shared=Count('pk', filter=~Q(owner=user)),
         )
         context['upcoming_trips'] = trips.filter(end_date__gte=today).exclude(status=Trip.Status.CANCELLED).order_by('start_date')[:3]

@@ -28,12 +28,13 @@
             <div class="auth-content success-content">
                 <p class="auth-eyebrow">YOU'RE ALL SET</p>
                 <h1 id="auth-title">You are signed in</h1>
-                <p class="auth-intro">Welcome back, {{ username }}. Your next journey is waiting.</p>
+                <p class="auth-intro"><span data-greeting>Hello</span>, {{ username }}. Your next journey is waiting.</p>
                 <a class="submit-button" href="{% url 'home' %}">Continue to home <span aria-hidden="true">&#8599;&#xFE0E;</span></a>
                 <form class="logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="text-button" type="submit">Sign out</button></form>
             </div>
             <p class="auth-footnote">Good journeys start wherever you are.</p>
         </section>
     </main>
+<script>(function(){var h=new Date().getHours(),g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';document.querySelectorAll('[data-greeting]').forEach(function(el){el.textContent=g;});})();</script>
 </body>
 </html>

@@ -345,15 +345,27 @@ def checklist_toggle(request, item_id):
     item.is_complete = not item.is_complete
     item.save(update_fields=('is_complete',))
     _notify_group(item.trip, 'Preparation list updated', f'{item.title} was marked {"ready" if item.is_complete else "not ready"}.', request.user.pk)
+    totals = Checklist.objects.filter(trip_id=item.trip_id).aggregate(
+        all_count=Count('pk'),
+        all_done=Count('pk', filter=Q(is_complete=True)),
+        document_count=Count('pk', filter=Q(is_document=True)),
+        document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
+    )
+    # A fully checked list makes a planning trip Ready; unchecking anything puts it back to Planning.
+    trip = item.trip
+    all_checked = totals['all_count'] and totals['all_done'] == totals['all_count']
+    if all_checked and trip.status == Trip.Status.PLANNING:
+        trip.status = Trip.Status.READY
+        trip.save(update_fields=('status',))
+    elif not all_checked and trip.status == Trip.Status.READY:
+        trip.status = Trip.Status.PLANNING
+        trip.save(update_fields=('status',))
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         # Background save from the trip page: send back fresh totals instead of reloading the page.
-        totals = Checklist.objects.filter(trip_id=item.trip_id).aggregate(
-            all_count=Count('pk'),
-            all_done=Count('pk', filter=Q(is_complete=True)),
-            document_count=Count('pk', filter=Q(is_document=True)),
-            document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
-        )
-        return JsonResponse({'is_complete': item.is_complete, **totals})
+        return JsonResponse({
+            'is_complete': item.is_complete, **totals,
+            'trip_status': trip.status, 'trip_status_label': trip.get_status_display(),
+        })
     return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
 
 
@@ -471,6 +483,8 @@ def notification_mark_read(request, notification_id):
     )
     notification.is_read = True
     notification.save(update_fields=('is_read',))
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'is_read': True})
     next_url = request.POST.get('next') or request.META.get('HTTP_REFERER', '')
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         return redirect(next_url)

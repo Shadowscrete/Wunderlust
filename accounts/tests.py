@@ -25,7 +25,7 @@ class AuthenticationLandingTests(TestCase):
         self.assertRedirects(response, reverse('login_success'))
         self.assertContains(
             self.client.get(reverse('login_success')),
-            f'Welcome back, {self.username}.',
+            f'<span data-greeting>Hello</span>, {self.username}.',
         )
 
     def test_success_landing_requires_authentication(self):

@@ -2513,3 +2513,7 @@ html{scrollbar-gutter:stable}
 .report-reason{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;cursor:pointer}
 .report-reason:has(input:checked){border-color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,transparent)}
 @media(max-width:560px){.public-actions{align-items:flex-start;flex-direction:row}.person-row{flex-wrap:wrap}.person-row .person-badge{order:3}}
+
+/* Trip detail: status pill beside the title */
+.trip-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.trip-title-row h1{margin-bottom:0}

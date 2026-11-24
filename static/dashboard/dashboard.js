@@ -83,6 +83,33 @@
     }
   }
 
+  // "Mark read" saves in the background instead of reloading the page.
+  // Capture phase so it runs before the page-loading skeleton handler.
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !/\/notifications\/\d+\/read\/?$/.test(new URL(form.action, location.href).pathname)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (form.dataset.busy) return;
+    form.dataset.busy = '1';
+    const row = form.closest('.inbox-item, .notification-page-row, article, li');
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const dot = row && row.querySelector('.notification-dot');
+      if (dot) dot.classList.add('read');
+      form.remove();
+      refreshNotificationCount();
+    } catch (_) {
+      delete form.dataset.busy;
+    }
+  }, true);
+
   refreshNotificationCount();
   window.setInterval(refreshNotificationCount, 60000);
 
@@ -383,6 +410,13 @@
     if (bar) bar.style.width = `${percent}%`;
   };
 
+  const updateTripStatus = ({ trip_status, trip_status_label }) => {
+    const pill = $('[data-trip-status]');
+    if (!pill || !trip_status) return;
+    pill.className = `status-pill status-${trip_status.toLowerCase()}`;
+    pill.textContent = trip_status_label;
+  };
+
   forms.forEach((form) => {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -403,6 +437,7 @@
         const data = await response.json();
         paint(form, data.is_complete);      // trust the server's answer
         updateTotals(data);
+        updateTripStatus(data);
       } catch (_) {
         paint(form, was);                   // revert if it didn't save
         button.classList.add('check-failed');

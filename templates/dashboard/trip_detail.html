@@ -1,5 +1,6 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ trip.destination }} | Wunderlust{% if trip.owner_id == request.user.id %}
+{% block title %}{{ trip.destination }} | Wunderlust{% endblock %}
+{% block content %}{% if trip.owner_id == request.user.id %}
 <dialog class="modal" id="delete-trip-dialog" aria-labelledby="delete-trip-title">
     <form method="post" action="{% url 'trip_delete' trip.pk %}" class="modal-body">{% csrf_token %}
         <div class="modal-head"><div><h2 id="delete-trip-title">Delete this trip?</h2><p>{{ trip.destination }}{% if trip.country %}, {{ trip.country }}{% endif %} · {{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
@@ -8,10 +9,8 @@
     </form>
 </dialog>
 {% endif %}
-{% endblock %}
-{% block content %}
 <a class="back-link" href="{% url 'trip_list' %}">←︎ My trips</a>
-<div class="page-heading trip-detail-heading"><div><p class="eyebrow">TRIP OVERVIEW</p><h1>{{ trip.destination }}{% if trip.country %}, {{ trip.country }}{% endif %}</h1><p class="page-subtitle">{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}{% if trip.airline %}<span class="inline-separator">·</span>{{ trip.airline }}{% endif %}</p></div><div class="trip-heading-actions"><span class="status-pill status-{{ trip.status|lower }}">{{ trip.get_status_display }}</span>{% if trip.owner_id == request.user.id %}<a class="button button-secondary button-small" href="{% url 'trip_edit' trip.pk %}">Edit trip</a><button class="button button-danger-outline button-small" type="button" data-dialog-open="delete-trip-dialog">Delete</button>{% endif %}</div></div>
+<div class="page-heading trip-detail-heading"><div><p class="eyebrow">TRIP OVERVIEW</p><div class="trip-title-row"><h1>{{ trip.destination }}{% if trip.country %}, {{ trip.country }}{% endif %}</h1><span class="status-pill status-{{ trip.status|lower }}" data-trip-status>{{ trip.get_status_display }}</span></div><p class="page-subtitle">{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}{% if trip.airline %}<span class="inline-separator">·</span>{{ trip.airline }}{% endif %}</p></div><div class="trip-heading-actions">{% if trip.owner_id == request.user.id %}<a class="button button-secondary button-small" href="{% url 'trip_edit' trip.pk %}">Edit trip</a><button class="button button-danger-outline button-small" type="button" data-dialog-open="delete-trip-dialog">Delete</button>{% endif %}</div></div>
 <nav class="trip-tabs" role="tablist" aria-label="Trip sections" data-tabs data-active-tab="{{ active_tab }}">
     <button class="trip-tab" type="button" role="tab" id="tab-overview" aria-controls="panel-overview" data-tab="overview">Overview</button>
     <button class="trip-tab" type="button" role="tab" id="tab-preparation" aria-controls="panel-preparation" data-tab="preparation">Preparation <span class="trip-tab-count" data-prep-tab>{{ all_done }}/{{ all_count }}</span></button>

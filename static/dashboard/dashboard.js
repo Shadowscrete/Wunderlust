@@ -443,6 +443,20 @@ function assertJson(response) {
     if (bar) bar.style.width = `${percent}%`;
   };
 
+  // My row in the Travelers panel (shown on more than one tab) plus the "x/y ready" badge.
+  const updateMyProgress = ({ my_percent, my_done, my_total, my_ready, group_ready_count, group_size }) => {
+    if (typeof my_percent !== 'number') return;
+    document.querySelectorAll('[data-traveler-me]').forEach((row) => {
+      const meter = row.querySelector('[data-my-progress]');
+      const bar = row.querySelector('[data-bar]');
+      const caption = row.querySelector('[data-caption]');
+      if (meter) meter.setAttribute('aria-valuenow', String(my_percent));
+      if (bar) { bar.style.width = `${my_percent}%`; bar.classList.toggle('is-ready', !!my_ready); }
+      if (caption) caption.textContent = my_ready ? 'Ready to go' : `${my_done} of ${my_total} items · ${my_percent}%`;
+    });
+    document.querySelectorAll('[data-group-ready]').forEach((badge) => { badge.textContent = `${group_ready_count}/${group_size} ready`; });
+  };
+
   const updateTripStatus = ({ trip_status, trip_status_label }) => {
     const pill = $('[data-trip-status]');
     if (!pill || !trip_status) return;
@@ -470,6 +484,7 @@ function assertJson(response) {
         paint(form, data.is_complete);      // trust the server's answer
         updateTotals(data);
         updateTripStatus(data);
+        updateMyProgress(data);
       } catch (err) {
         showErrorToast(err);
         paint(form, was);                   // revert if it didn't save

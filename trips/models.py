@@ -164,6 +164,49 @@ class Checklist(models.Model):
         return self.title
 
 
+class ChecklistCheck(models.Model):
+    """One traveler's tick on a checklist item. Everyone on a trip shares the item list,
+    but each member ticks their own copy, so each person has their own progress."""
+    item = models.ForeignKey(Checklist, on_delete=models.CASCADE, related_name='checks')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='checklist_checks')
+    checked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('item', 'user'), name='unique_check_per_item_and_user')]
+
+    def __str__(self):
+        return f'{self.user} ✓ {self.item}'
+
+
+def trip_travelers(trip):
+    """Everyone on a trip: the owner first, then group members in the order they joined."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    rows = [(trip.owner, 'Organizer')]
+    seen = {trip.owner_id}
+    group = getattr(trip, 'group_trip', None) if trip.is_group_trip else None
+    if group:
+        for member in group.members.select_related('user', 'user__profile').order_by('joined_at'):
+            if member.user_id not in seen:
+                seen.add(member.user_id)
+                rows.append((member.user, member.get_membership_display()))
+    return rows
+
+
+def trip_readiness(trip):
+    """Each traveler's checklist progress for a trip, from two queries."""
+    from django.db.models import Count
+    total = trip.checklist_items.count()
+    done = dict(ChecklistCheck.objects.filter(item__trip=trip).values_list('user').annotate(n=Count('pk')))
+    out = []
+    for user, role in trip_travelers(trip):
+        n = done.get(user.pk, 0)
+        out.append({'user': user, 'role': role, 'done': n, 'total': total,
+                    'percent': round(n * 100 / total) if total else 0,
+                    'is_ready': bool(total) and n >= total})
+    return out
+
+
 class GroupTrip(models.Model):
     trip = models.OneToOneField(Trip, on_delete=models.CASCADE, related_name='group_trip')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_group_trips')

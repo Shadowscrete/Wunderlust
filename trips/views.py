@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, F, OuterRef, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -17,8 +17,10 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
-from .models import Activity, Checklist, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
+from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
 from .recommendations import ideas_for
+from .models import trip_readiness
+from accounts.social import avatar_url_for, initials_for
 
 User = get_user_model()
 
@@ -40,14 +42,14 @@ def traveler_dashboard(request):
     upcoming_trips = trips.filter(end_date__gte=timezone.localdate()).order_by('start_date')
     # Readiness is scoped to trips that are still ahead of the traveler.
     checklist_items = Checklist.objects.filter(trip__in=upcoming_trips)
-    documents = checklist_items.filter(is_document=True)
-    packing_items = checklist_items.filter(is_document=False)
+    documents = _with_my_ticks(checklist_items.filter(is_document=True), request.user)
+    packing_items = _with_my_ticks(checklist_items.filter(is_document=False), request.user)
     # One aggregate query instead of ten separate COUNT/EXISTS round-trips.
     stats = checklist_items.aggregate(
-        document_total=Count('pk', filter=Q(is_document=True)),
-        document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
-        packing_total=Count('pk', filter=Q(is_document=False)),
-        packing_done=Count('pk', filter=Q(is_document=False, is_complete=True)),
+        document_total=Count('pk', distinct=True, filter=Q(is_document=True)),
+        document_done=Count('pk', distinct=True, filter=Q(is_document=True, checks__user=request.user)),
+        packing_total=Count('pk', distinct=True, filter=Q(is_document=False)),
+        packing_done=Count('pk', distinct=True, filter=Q(is_document=False, checks__user=request.user)),
     )
     recent_activities = Activity.objects.filter(
         day__trip__in=trips,
@@ -198,6 +200,30 @@ def trip_create(request):
     return render(request, 'dashboard/trip_form.html', {'form': form})
 
 
+def _with_my_ticks(items, user):
+    """Annotate checklist items with is_checked: whether *this* traveler has ticked them."""
+    return items.annotate(is_checked=Exists(ChecklistCheck.objects.filter(item=OuterRef('pk'), user=user)))
+
+
+def _my_totals(trip_id, user):
+    """This traveler's progress on one trip's checklist."""
+    return Checklist.objects.filter(trip_id=trip_id).aggregate(
+        all_count=Count('pk', distinct=True),
+        all_done=Count('pk', distinct=True, filter=Q(checks__user=user)),
+        document_count=Count('pk', distinct=True, filter=Q(is_document=True)),
+        document_done=Count('pk', distinct=True, filter=Q(is_document=True, checks__user=user)),
+    )
+
+
+def _readiness_rows(trip, viewer):
+    rows = trip_readiness(trip)
+    for row in rows:
+        row['is_me'] = row['user'].pk == viewer.pk
+        row['avatar_url'] = avatar_url_for(row['user'])
+        row['initials'] = initials_for(row['user'])
+    return rows
+
+
 def _post_id(request, name):
     """A whole-number id from POST data, or None. Garbage like "abc" must mean "not found", not a server error."""
     value = request.POST.get(name, '')
@@ -247,7 +273,7 @@ def trip_delete(request, trip_id):
 @role_required(User.Role.TRAVELER)
 def trip_detail(request, trip_id):
     trip = get_object_or_404(_accessible_trips(request.user).select_related('owner'), pk=trip_id)
-    checklist = trip.checklist_items.all()
+    checklist = _with_my_ticks(trip.checklist_items.all(), request.user)
     documents = checklist.filter(is_document=True)
     essentials = checklist.filter(is_document=False)
     travel_info_form = TripTravelInfoForm(prefix='info')
@@ -314,6 +340,7 @@ def trip_detail(request, trip_id):
                 messages.success(request, 'Itinerary day added.')
                 return redirect('trip_detail', trip_id=trip.pk)
     days = trip.itinerary_days.prefetch_related('activities').all()
+    travelers = _readiness_rows(trip, request.user)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
     travel_info = list(trip.travel_info.all())
@@ -322,10 +349,9 @@ def trip_detail(request, trip_id):
         'days': days,
         'documents': documents,
         'essentials': essentials,
-        'document_count': documents.count(),
-        'document_done': documents.filter(is_complete=True).count(),
-        'all_count': checklist.count(),
-        'all_done': checklist.filter(is_complete=True).count(),
+        **_my_totals(trip.pk, request.user),
+        'travelers': travelers,
+        'ready_count': sum(1 for row in travelers if row['is_ready']),
         'travel_info': travel_info,
         'travel_info_form': travel_info_form,
         'flights': flights,
@@ -343,31 +369,36 @@ def trip_detail(request, trip_id):
 @require_POST
 def checklist_toggle(request, item_id):
     item = get_object_or_404(Checklist.objects.select_related('trip'), pk=item_id, trip__in=_accessible_trips(request.user))
-    item.is_complete = not item.is_complete
-    item.save(update_fields=('is_complete',))
-    _notify_group(item.trip, 'Preparation list updated', f'{item.title} was marked {"ready" if item.is_complete else "not ready"}.', request.user.pk)
-    totals = Checklist.objects.filter(trip_id=item.trip_id).aggregate(
-        all_count=Count('pk'),
-        all_done=Count('pk', filter=Q(is_complete=True)),
-        document_count=Count('pk', filter=Q(is_document=True)),
-        document_done=Count('pk', filter=Q(is_document=True, is_complete=True)),
-    )
-    # A fully checked list makes a planning trip Ready; unchecking anything puts it back to Planning.
+    # Each traveler ticks their own copy of the item.
+    removed, _ = ChecklistCheck.objects.filter(item=item, user=request.user).delete()
+    if not removed:
+        ChecklistCheck.objects.get_or_create(item=item, user=request.user)
+    is_checked = not removed
     trip = item.trip
-    all_checked = totals['all_count'] and totals['all_done'] == totals['all_count']
-    if all_checked and trip.status == Trip.Status.PLANNING:
+    totals = _my_totals(trip.pk, request.user)
+    # The trip is Ready once every traveler has ticked every item; anything less puts it back to Planning.
+    readiness = _readiness_rows(trip, request.user)
+    everyone_ready = bool(readiness) and all(row['is_ready'] for row in readiness)
+    if everyone_ready and trip.status == Trip.Status.PLANNING:
         trip.status = Trip.Status.READY
         trip.save(update_fields=('status',))
-    elif not all_checked and trip.status == Trip.Status.READY:
+    elif not everyone_ready and trip.status == Trip.Status.READY:
         trip.status = Trip.Status.PLANNING
         trip.save(update_fields=('status',))
+    if trip.is_group_trip:
+        me = next((row for row in readiness if row['is_me']), None)
+        if me and me['is_ready'] and is_checked:
+            _notify_group(trip, 'A traveler is ready', f'{request.user.get_username()} has finished their checklist for {trip.destination}.', request.user.pk)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         # Background save from the trip page: send back fresh totals instead of reloading the page.
+        me = next((row for row in readiness if row['is_me']), {'percent': 0, 'done': 0, 'total': 0, 'is_ready': False})
         return JsonResponse({
-            'is_complete': item.is_complete, **totals,
+            'is_complete': is_checked, **totals,
             'trip_status': trip.status, 'trip_status_label': trip.get_status_display(),
+            'my_percent': me['percent'], 'my_done': me['done'], 'my_total': me['total'], 'my_ready': me['is_ready'],
+            'group_ready_count': sum(1 for row in readiness if row['is_ready']), 'group_size': len(readiness),
         })
-    return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
+    return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#preparation")
 
 
 @role_required(User.Role.TRAVELER)
@@ -515,7 +546,7 @@ def admin_dashboard(request):
     if trip_status in Trip.Status.values:
         trips = trips.filter(status=trip_status)
 
-    checklist_stats = Checklist.objects.aggregate(total=Count('id'), complete=Count('id', filter=Q(is_complete=True)))
+    checklist_stats = Checklist.objects.aggregate(total=Count('id', distinct=True), complete=Count('id', distinct=True, filter=Q(checks__user=F('trip__owner'))))
     total_checklist = checklist_stats['total'] or 0
     complete_checklist = checklist_stats['complete'] or 0
     completion_rate = round(complete_checklist * 100 / total_checklist) if total_checklist else 0

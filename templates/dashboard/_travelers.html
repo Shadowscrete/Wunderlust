@@ -1,0 +1,25 @@
+{# Who is on the trip and how prepared each person is. Used on the Overview and Preparation tabs. #}
+<section class="dashboard-section detail-section travelers-section" aria-labelledby="travelers-title-{{ where }}">
+    <div class="section-heading"><div><p class="eyebrow">{% if travelers|length > 1 %}TRAVELING TOGETHER{% else %}TRAVELER{% endif %}</p><h2 id="travelers-title-{{ where }}">{% if travelers|length > 1 %}{{ travelers|length }} travelers{% else %}Just you{% endif %}</h2></div>
+        {% if travelers|length > 1 %}<span class="count-badge" data-group-ready>{{ ready_count }}/{{ travelers|length }} ready</span>{% endif %}</div>
+    <ul class="traveler-list">
+        {% for row in travelers %}
+        <li class="traveler-row"{% if row.is_me %} data-traveler-me{% endif %}>
+            <a class="traveler-avatar" href="{% if row.is_me %}{% url 'profile' %}{% else %}{% url 'public_profile' row.user.get_username %}{% endif %}" aria-label="View {{ row.user.get_full_name|default:row.user.get_username }}’s profile"><span>{{ row.initials }}</span>{% if row.avatar_url %}<img src="{{ row.avatar_url }}" alt="" loading="lazy">{% endif %}</a>
+            <div class="traveler-main">
+                <div class="traveler-line">
+                    <a class="traveler-name" href="{% if row.is_me %}{% url 'profile' %}{% else %}{% url 'public_profile' row.user.get_username %}{% endif %}">{{ row.user.get_full_name|default:row.user.get_username }}{% if row.is_me %} <small>(you)</small>{% endif %}</a>
+                    <span class="traveler-role">{{ row.role }}</span>
+                </div>
+                {% if row.total %}
+                <div class="traveler-progress" role="progressbar" aria-label="{{ row.user.get_full_name|default:row.user.get_username }}’s preparation" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ row.percent }}"{% if row.is_me %} data-my-progress{% endif %}>
+                    <span class="traveler-bar{% if row.is_ready %} is-ready{% endif %}" style="width:{{ row.percent }}%" data-bar></span>
+                </div>
+                <small class="traveler-caption" data-caption>{% if row.is_ready %}Ready to go{% else %}{{ row.done }} of {{ row.total }} items · {{ row.percent }}%{% endif %}</small>
+                {% else %}<small class="traveler-caption">No checklist items yet</small>{% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% if travelers|length == 1 and trip.owner_id == request.user.id %}<p class="empty-inline">Invite friends with the trip’s invite link to plan together.</p>{% endif %}
+</section>

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Activity, Checklist, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
+from .models import Flight, Activity, Checklist, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
 
 
 class ActivityInline(admin.TabularInline):
@@ -26,4 +26,4 @@ class ItineraryDayAdmin(admin.ModelAdmin):
     inlines = (ActivityInline,)
 
 
-admin.site.register((Activity, TravelInfo, Checklist, GroupTrip, GroupMember, Notification, TripPlace))
+admin.site.register((Flight, Activity, TravelInfo, Checklist, GroupTrip, GroupMember, Notification, TripPlace))

@@ -7,7 +7,9 @@
     <meta name="theme-color" content="#f5f3ed">
     <meta name="description" content="Find your next somewhere with Wunderlust. Thoughtful travel starts here.">
     <title>Wunderlust — Find your somewhere</title>
-    <link rel="icon" href="{% static 'home/assets/Wunderlust-Logo.png' %}" type="image/png">
+    <link rel="icon" href="{% static 'home/assets/favicon.ico' %}" sizes="any">
+    <link rel="icon" href="{% static 'home/assets/favicon.png' %}" type="image/png">
+    <link rel="apple-touch-icon" href="{% static 'home/assets/apple-touch-icon.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
@@ -49,15 +51,15 @@
             </div>
             <div class="inspiration-grid" id="inspiration">
                 <article class="feature feature-lake">
-                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore lake and mountain escapes">
-                        <img src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="View from a boat on a still mountain lake" loading="lazy">
-                        <span class="feature-label">FIND YOUR STILLNESS</span><span class="feature-caption"><span>Lake &amp; mountain escapes</span><span aria-hidden="true">&#8599;</span></span>
+                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore culture and mountain journeys">
+                        <img src="{% static 'home/assets/fuji-pagoda.jpg' %}" width="2200" height="1466" alt="A red pagoda overlooking a city with snow-capped Mount Fuji behind it" loading="lazy">
+                        <span class="feature-label">FIND YOUR WONDER</span><span class="feature-caption"><span>Culture &amp; mountain views</span><span aria-hidden="true">&#8599;</span></span>
                     </a>
                 </article>
                 <article class="feature feature-road">
-                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore journeys off the beaten path">
-                        <img src="{% static 'home/assets/roadsigns-travel.jpg' %}" width="1500" height="2250" alt="Colorful signposts pointing travelers toward places to explore" loading="lazy">
-                        <span class="feature-label">TAKE THE SCENIC ROUTE</span><span class="feature-caption"><span>Journeys off the beaten path</span><span aria-hidden="true">&#8599;</span></span>
+                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore coast and island escapes">
+                        <img src="{% static 'home/assets/beach-aerial.jpg' %}" width="1775" height="2200" alt="Boats anchored in turquoise water beside a white sand beach, seen from above" loading="lazy">
+                        <span class="feature-label">FIND YOUR SHORE</span><span class="feature-caption"><span>Coast &amp; island escapes</span><span aria-hidden="true">&#8599;</span></span>
                     </a>
                 </article>
             </div>

@@ -16,8 +16,8 @@ from accounts.context_processors import get_user_prefs
 from accounts.models import Profile
 
 from .decorators import role_required
-from .forms import ActivityForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
-from .models import Activity, Checklist, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
+from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
+from .models import Activity, Checklist, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
 from .recommendations import ideas_for
 
 User = get_user_model()
@@ -55,10 +55,6 @@ def traveler_dashboard(request):
     ).select_related('day__trip').order_by('day__date', 'start_time')[:6]
     group_memberships = GroupMember.objects.filter(user=request.user).select_related('group_trip__trip', 'group_trip__created_by')
     travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).distinct()[:8]
-    notifications = Notification.objects.filter(
-        _notification_scope(request.user),
-        created_at__date=timezone.localdate(),
-    ).filter(Q(trip__in=trips) | Q(trip__isnull=True))[:8]
     return render(request, 'dashboard/traveler.html', {
         'trips': upcoming_trips[:5],
         'documents': documents,
@@ -72,7 +68,6 @@ def traveler_dashboard(request):
         'activities': recent_activities,
         'group_memberships': group_memberships[:5],
         'travel_info': travel_info,
-        'notifications': notifications,
         'today_notification_count': Notification.objects.filter(
             _notification_scope(request.user), created_at__date=timezone.localdate(), is_read=False
         ).count(),
@@ -142,26 +137,24 @@ def _build_itinerary(trip, place_names):
 
 @role_required(User.Role.TRAVELER)
 def trip_list(request):
-    trips = _accessible_trips(request.user).select_related('owner').order_by('start_date')
+    # One query for the whole list: group info is joined and checklist counts are annotated,
+    # instead of extra queries per trip card.
+    trips = _accessible_trips(request.user).select_related('owner', 'group_trip').annotate(
+        checklist_total=Count('checklist_items', distinct=True),
+    ).order_by('start_date')
     return render(request, 'dashboard/trip_list.html', {'trips': trips})
 
 
 @role_required(User.Role.TRAVELER)
 def preparation_overview(request):
-    trips = _accessible_trips(request.user).annotate(
-        checklist_total=Count('checklist_items'),
-        checklist_done=Count('checklist_items', filter=Q(checklist_items__is_complete=True)),
-        documents_total=Count('checklist_items', filter=Q(checklist_items__is_document=True)),
-        documents_done=Count('checklist_items', filter=Q(checklist_items__is_document=True, checklist_items__is_complete=True)),
-    ).order_by('start_date')
-    return render(request, 'dashboard/preparation.html', {'trips': trips})
+    # Preparation and travel information now live inside each trip (tabs on the trip page).
+    return redirect('trip_list')
 
 
 @role_required(User.Role.TRAVELER)
 def travel_information_overview(request):
-    trips = _accessible_trips(request.user)
-    entries = TravelInfo.objects.filter(Q(trip__in=trips) | Q(trip__isnull=True)).select_related('trip').distinct()
-    return render(request, 'dashboard/travel_information.html', {'entries': entries})
+    # Preparation and travel information now live inside each trip (tabs on the trip page).
+    return redirect('trip_list')
 
 
 @role_required(User.Role.TRAVELER)
@@ -204,6 +197,52 @@ def trip_create(request):
     return render(request, 'dashboard/trip_form.html', {'form': form})
 
 
+def _post_id(request, name):
+    """A whole-number id from POST data, or None. Garbage like "abc" must mean "not found", not a server error."""
+    value = request.POST.get(name, '')
+    return int(value) if value.isdigit() else None
+
+
+def _owned_trip(request, trip_id):
+    """Only the trip's owner may edit or delete it."""
+    return get_object_or_404(Trip.objects.select_related('owner'), pk=trip_id, owner=request.user)
+
+
+@role_required(User.Role.TRAVELER)
+def trip_edit(request, trip_id):
+    trip = _owned_trip(request, trip_id)
+    form = TripEditForm(request.POST or None, instance=trip)
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            trip = form.save()
+            # Itinerary days outside the new dates no longer belong to the trip.
+            removed, _ = trip.itinerary_days.exclude(date__range=(trip.start_date, trip.end_date)).delete()
+        _notify_group(trip, 'Trip details updated', f'{request.user.get_username()} updated the trip to {trip.destination}.', request.user.pk)
+        messages.success(request, 'Trip updated.' + (' Itinerary days outside the new dates were removed.' if removed else ''))
+        return redirect('trip_detail', trip_id=trip.pk)
+    return render(request, 'dashboard/trip_form.html', {'form': form, 'trip': trip, 'editing': True})
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
+def trip_delete(request, trip_id):
+    trip = _owned_trip(request, trip_id)
+    destination = trip.destination
+    group = getattr(trip, 'group_trip', None)
+    member_ids = list(group.members.exclude(user=request.user).values_list('user_id', flat=True)) if group else []
+    with transaction.atomic():
+        trip.delete()
+        # trip=None: these notices must outlive the trip they describe.
+        if member_ids:
+            muted = set(Profile.objects.filter(user_id__in=member_ids, notify_trip_updates=False).values_list('user_id', flat=True))
+            Notification.objects.bulk_create([
+                Notification(user_id=uid, title='Trip deleted', message=f'{request.user.get_username()} deleted the trip to {destination}.')
+                for uid in member_ids if uid not in muted
+            ])
+    messages.success(request, f'The trip to {destination} was deleted.')
+    return redirect('trip_list')
+
+
 @role_required(User.Role.TRAVELER)
 def trip_detail(request, trip_id):
     trip = get_object_or_404(_accessible_trips(request.user).select_related('owner'), pk=trip_id)
@@ -214,10 +253,28 @@ def trip_detail(request, trip_id):
     checklist_form = CustomChecklistForm(prefix='item')
     activity_form = ActivityForm()
     itinerary_day_form = ItineraryDayForm(trip)
+    flight_form = FlightForm(trip, prefix='flight')
+    active_tab = 'overview'
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'add_travel_info':
+        if action == 'add_flight':
+            flight_form = FlightForm(trip, request.POST, prefix='flight')
+            active_tab = 'travel-info'
+            if flight_form.is_valid():
+                flight = flight_form.save(commit=False)
+                flight.added_by = request.user
+                flight.save()
+                _notify_group(trip, 'Flight added', f'{flight.flight_number} on {flight.flight_date:%b %d} was added to {trip.destination}.', request.user.pk)
+                messages.success(request, f'Flight {flight.flight_number} added.')
+                return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
+        elif action == 'delete_flight':
+            flight = get_object_or_404(trip.flights, pk=_post_id(request, 'flight_id'))
+            messages.success(request, f'Flight {flight.flight_number} removed.')
+            flight.delete()
+            return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
+        elif action == 'add_travel_info':
             travel_info_form = TripTravelInfoForm(request.POST, prefix='info')
+            active_tab = 'travel-info'
             if travel_info_form.is_valid():
                 info = travel_info_form.save(commit=False)
                 info.trip = trip
@@ -225,9 +282,10 @@ def trip_detail(request, trip_id):
                 info.save()
                 _notify_group(trip, 'Travel information updated', f'{info.title} was added to {trip.destination}.', request.user.pk)
                 messages.success(request, 'Travel information saved.')
-                return redirect('trip_detail', trip_id=trip.pk)
+                return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
         elif action == 'add_checklist_item':
             checklist_form = CustomChecklistForm(request.POST, prefix='item')
+            active_tab = 'preparation'
             if checklist_form.is_valid():
                 item = checklist_form.save(commit=False)
                 item.trip = trip
@@ -235,9 +293,9 @@ def trip_detail(request, trip_id):
                 item.save()
                 _notify_group(trip, 'Preparation list updated', f'{item.title} was added to the checklist.', request.user.pk)
                 messages.success(request, 'Custom item added.')
-                return redirect('trip_detail', trip_id=trip.pk)
+                return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#preparation")
         elif action == 'add_activity':
-            day = get_object_or_404(trip.itinerary_days, pk=request.POST.get('day_id'))
+            day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
             activity_form = ActivityForm(request.POST)
             if activity_form.is_valid():
                 activity = activity_form.save(commit=False)
@@ -256,6 +314,8 @@ def trip_detail(request, trip_id):
                 return redirect('trip_detail', trip_id=trip.pk)
     days = trip.itinerary_days.prefetch_related('activities').all()
     group_trip = getattr(trip, 'group_trip', None)
+    flights = list(trip.flights.all())
+    travel_info = list(trip.travel_info.all())
     return render(request, 'dashboard/trip_detail.html', {
         'trip': trip,
         'days': days,
@@ -265,12 +325,16 @@ def trip_detail(request, trip_id):
         'document_done': documents.filter(is_complete=True).count(),
         'all_count': checklist.count(),
         'all_done': checklist.filter(is_complete=True).count(),
-        'travel_info': trip.travel_info.all(),
+        'travel_info': travel_info,
         'travel_info_form': travel_info_form,
+        'flights': flights,
+        'travel_tab_count': len(flights) + len(travel_info),
+        'flight_form': flight_form,
         'checklist_form': checklist_form,
         'activity_form': activity_form,
         'itinerary_day_form': itinerary_day_form,
         'group_trip': group_trip,
+        'active_tab': active_tab,
     })
 
 
@@ -281,7 +345,7 @@ def checklist_toggle(request, item_id):
     item.is_complete = not item.is_complete
     item.save(update_fields=('is_complete',))
     _notify_group(item.trip, 'Preparation list updated', f'{item.title} was marked {"ready" if item.is_complete else "not ready"}.', request.user.pk)
-    return redirect('trip_detail', trip_id=item.trip_id)
+    return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
 
 
 @role_required(User.Role.TRAVELER)
@@ -294,7 +358,7 @@ def checklist_quantity_update(request, item_id):
         messages.success(request, f'Amount updated for {item.title}.')
     else:
         messages.error(request, 'Enter an amount of one or more.')
-    return redirect('trip_detail', trip_id=item.trip_id)
+    return redirect(f"{reverse('trip_detail', kwargs={'trip_id': item.trip_id})}#preparation")
 
 
 @role_required(User.Role.TRAVELER)

@@ -218,3 +218,126 @@
     });
   });
 })();
+
+(() => {
+  // Show a page skeleton while the next dashboard page loads (server round-trips can take a second or two).
+  const skeleton = document.querySelector('[data-page-skeleton]');
+  if (!skeleton) return;
+  let timer = null;
+  const routes = [
+    [/^\/dashboard\/traveler\/$/, 'overview'],
+    [/^\/dashboard\/admin\/$/, 'admin'],
+    [/^\/dashboard\/trips\/new\/$/, 'trip-form'],
+    [/^\/dashboard\/trips\/\d+\/edit\/$/, 'trip-form'],
+    [/^\/dashboard\/trips\/\d+\//, 'trip-detail'],
+    [/^\/dashboard\/trips\/$/, 'trip-list'],
+    [/^\/dashboard\/activities\/$/, 'activity'],
+    [/^\/accounts\/profile\//, 'profile'],
+    [/^\/accounts\/settings\/$/, 'settings'],
+    [/^\/accounts\/support\/$/, 'support'],
+  ];
+  const skeletonFor = (pathname) => (routes.find(([pattern]) => pattern.test(pathname)) || [null, 'list'])[1];
+  const render = (pathname) => {
+    const template = document.querySelector(`template[data-skeleton="${skeletonFor(pathname)}"]`)
+      || document.querySelector('template[data-skeleton="list"]');
+    skeleton.replaceChildren(template.content.cloneNode(true));
+  };
+  const show = (pathname) => {
+    // Small delay so fast loads don't flash the skeleton.
+    timer = window.setTimeout(() => {
+      render(pathname);
+      skeleton.hidden = false;
+      document.body.classList.add('is-navigating');
+      window.scrollTo(0, 0);
+    }, 150);
+  };
+  const reset = () => {
+    window.clearTimeout(timer);
+    skeleton.hidden = true;
+    skeleton.replaceChildren();
+    document.body.classList.remove('is-navigating');
+  };
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+    if (!link || event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (link.target && link.target !== '_self') return;
+    if (link.hasAttribute('download')) return;
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    // Same-page anchors (#section) don't load a new page.
+    if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+    if (url.pathname.startsWith('/media/') || url.pathname.startsWith('/static/')) return;
+    show(url.pathname);
+  });
+
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (event.defaultPrevented || form.target === '_blank') return;
+    show(new URL(form.action || window.location.href, window.location.href).pathname);
+  });
+
+  // Coming back with the browser's Back button can restore this page from cache; clear the skeleton.
+  window.addEventListener('pageshow', reset);
+})();
+
+(() => {
+  // Trip page tabs: Overview / Preparation / Travel information. The URL hash keeps the tab across reloads and redirects.
+  const bar = document.querySelector('[data-tabs]');
+  if (!bar) return;
+  const tabs = [...bar.querySelectorAll('[data-tab]')];
+  const panels = [...document.querySelectorAll('[data-panel]')];
+  const names = tabs.map((tab) => tab.dataset.tab);
+
+  const select = (name, { focus = false, updateHash = true } = {}) => {
+    if (!names.includes(name)) name = names[0];
+    tabs.forEach((tab) => {
+      const active = tab.dataset.tab === name;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      tab.classList.toggle('active', active);
+      if (active && focus) tab.focus();
+    });
+    panels.forEach((panel) => { panel.hidden = panel.dataset.panel !== name; });
+    if (updateHash) history.replaceState(null, '', name === names[0] ? window.location.pathname + window.location.search : `#${name}`);
+  };
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => select(tab.dataset.tab));
+    tab.addEventListener('keydown', (event) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+      if (step) {
+        event.preventDefault();
+        select(names[(index + step + names.length) % names.length], { focus: true });
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        select(event.key === 'Home' ? names[0] : names[names.length - 1], { focus: true });
+      }
+    });
+  });
+
+  const fromHash = window.location.hash.slice(1);
+  const fromServer = bar.dataset.activeTab;
+  select(names.includes(fromHash) ? fromHash : (names.includes(fromServer) ? fromServer : names[0]), { updateHash: false });
+  window.addEventListener('hashchange', () => select(window.location.hash.slice(1), { updateHash: false }));
+})();
+
+
+(() => {
+  // "Other (type it in)" choices: show the matching text box only when Other is selected.
+  document.querySelectorAll('input[data-other-for]').forEach((input) => {
+    const select = document.getElementById(input.dataset.otherFor);
+    const field = input.closest('.form-field');
+    if (!select || !field) return;
+    const sync = (focus) => {
+      const isOther = select.value === '__other__';
+      field.hidden = !isOther;
+      input.required = isOther;
+      if (!isOther) input.value = '';
+      else if (focus) input.focus();
+    };
+    select.addEventListener('change', () => sync(true));
+    sync(false);
+  });
+})();

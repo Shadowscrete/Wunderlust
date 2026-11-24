@@ -17,6 +17,13 @@ class RegisterForm(UserCreationForm):
         model = User
         fields = ['username', 'email', 'password1', 'password2']
 
+    def clean_email(self):
+        # One account per email address, regardless of capitalisation.
+        email = self.cleaned_data['email'].strip()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError('An account with this email already exists.')
+        return email
+
 class AboutMeForm(forms.Form):
     """Fills in missing profile details. Anything already saved is locked (disabled),
     so Django ignores any submitted value for it and keeps the stored one."""

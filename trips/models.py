@@ -33,6 +33,19 @@ class Trip(models.Model):
     def __str__(self):
         return f'{self.destination} ({self.start_date:%b %d, %Y})'
 
+    def status_for_dates(self, today=None):
+        """The status this trip should have from its dates (Cancelled stays Cancelled)."""
+        from django.utils import timezone
+        today = today or timezone.localdate()
+        if self.status == self.Status.CANCELLED:
+            return self.status
+        if self.end_date < today:
+            return self.Status.COMPLETED
+        if self.start_date <= today:
+            return self.Status.IN_PROGRESS
+        # Back in the future (e.g. dates moved later): keep Ready if set, otherwise Planning.
+        return self.status if self.status == self.Status.READY else self.Status.PLANNING
+
     @property
     def is_group_trip(self):
         return hasattr(self, 'group_trip')
@@ -77,6 +90,38 @@ class Activity(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Flight(models.Model):
+    """A flight on a trip, stored in standard IATA form (carrier code + number + date)
+    so it can later be passed straight to a live flight-status service."""
+    class Leg(models.TextChoices):
+        OUTBOUND = 'OUTBOUND', 'Outbound'
+        RETURN = 'RETURN', 'Return'
+        CONNECTION = 'CONNECTION', 'Connection'
+        OTHER = 'OTHER', 'Other'
+
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='flights')
+    carrier_code = models.CharField(max_length=2, help_text='IATA airline code, e.g. PR')
+    number = models.CharField(max_length=5, help_text='Flight number digits plus optional suffix, e.g. 102 or 102A')
+    flight_date = models.DateField(help_text='Scheduled departure date (local time at the departure airport)')
+    leg = models.CharField(max_length=12, choices=Leg.choices, default=Leg.OUTBOUND)
+    airline_name = models.CharField(max_length=120, blank=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('flight_date', 'carrier_code', 'number')
+        constraints = [
+            models.UniqueConstraint(fields=('trip', 'carrier_code', 'number', 'flight_date'), name='unique_flight_per_trip_and_date'),
+        ]
+
+    @property
+    def flight_number(self):
+        return f'{self.carrier_code}{self.number}'
+
+    def __str__(self):
+        return f'{self.flight_number} on {self.flight_date:%Y-%m-%d}'
 
 
 class TravelInfo(models.Model):

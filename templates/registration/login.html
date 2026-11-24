@@ -4,6 +4,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{% static 'home/assets/favicon.ico' %}" sizes="any">
+    <link rel="icon" href="{% static 'home/assets/favicon.png' %}" type="image/png">
+    <link rel="apple-touch-icon" href="{% static 'home/assets/apple-touch-icon.png' %}">
     <meta name="theme-color" content="#f5f3ed">
     <title>Log in | Wunderlust</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,12 +16,12 @@
 </head>
 <body class="auth-body">
     <main class="auth-layout">
-        <section class="auth-visual" aria-label="A mountain lake journey">
-            <img src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="A wooden boat on a quiet alpine lake">
+        <section class="auth-visual" aria-label="A flight above the clouds">
+            <img src="{% static 'home/assets/plane-wing.jpg' %}" width="2200" height="1461" alt="An airplane wing above the clouds at sunset">
             <div class="auth-visual-shade"></div>
             <a class="auth-wordmark auth-wordmark-light" href="{% url 'home' %}">Wunderlust</a>
             <div class="auth-visual-copy"><p>TRAVEL, YOUR WAY</p><h2>A little closer<br>to your <em>somewhere.</em></h2><span>Make the journey your own.</span></div>
-            <span class="auth-image-caption">DOLOMITES, ITALY</span>
+            <span class="auth-image-caption">ABOVE THE CLOUDS</span>
         </section>
         <section class="auth-panel" aria-labelledby="auth-title">
             <div class="auth-panel-top"><a class="auth-wordmark" href="{% url 'home' %}">Wunderlust</a><a class="back-home" href="{% url 'home' %}"><span aria-hidden="true">&#8592;</span> Back to home</a></div>

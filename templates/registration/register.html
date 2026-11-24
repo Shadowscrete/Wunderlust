@@ -4,6 +4,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{% static 'home/assets/favicon.ico' %}" sizes="any">
+    <link rel="icon" href="{% static 'home/assets/favicon.png' %}" type="image/png">
+    <link rel="apple-touch-icon" href="{% static 'home/assets/apple-touch-icon.png' %}">
     <meta name="theme-color" content="#f5f3ed">
     <title>Create an account | Wunderlust</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,12 +16,12 @@
 </head>
 <body class="auth-body">
     <main class="auth-layout auth-layout-register">
-        <section class="auth-visual" aria-label="A mountain lake journey">
-            <img src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="A wooden boat on a quiet alpine lake">
+        <section class="auth-visual" aria-label="A turquoise beach from above">
+            <img src="{% static 'home/assets/beach-aerial.jpg' %}" width="1775" height="2200" alt="Boats anchored in turquoise water beside a white sand beach">
             <div class="auth-visual-shade"></div>
             <a class="auth-wordmark auth-wordmark-light" href="{% url 'home' %}">Wunderlust</a>
             <div class="auth-visual-copy"><p>MAKE ROOM FOR MORE</p><h2>Your next chapter<br>starts <em>somewhere.</em></h2><span>Come curious. Leave with a story.</span></div>
-            <span class="auth-image-caption">DOLOMITES, ITALY</span>
+            <span class="auth-image-caption">SOMEWHERE ON THE COAST</span>
         </section>
         <section class="auth-panel" aria-labelledby="auth-title">
             <div class="auth-panel-top"><a class="auth-wordmark" href="{% url 'home' %}">Wunderlust</a><a class="back-home" href="{% url 'home' %}"><span aria-hidden="true">&#8592;</span> Back to home</a></div>

@@ -113,7 +113,8 @@ def account_settings(request):
                 messages.success(request, 'Notification preferences saved.')
                 return redirect('account_settings')
         elif action == 'signout_device':
-            row = UserSession.objects.filter(user=user, pk=request.POST.get('device')).first()
+            device_id = request.POST.get('device', '')
+            row = UserSession.objects.filter(user=user, pk=int(device_id)).first() if device_id.isdigit() else None
             if row and row.session_key != request.session.session_key:
                 end_session(row.session_key)
                 messages.success(request, 'That device has been signed out.')

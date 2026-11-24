@@ -141,7 +141,8 @@ if ON_VERCEL:
     # The cache lives in the database (table created by migration accounts/0008), and sessions are DB-only.
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+            # Creates its table automatically if the migration hasn't been applied yet (see config/cache.py).
+            'BACKEND': 'config.cache.SelfHealingDatabaseCache',
             'LOCATION': 'wunderlust_cache',
         }
     }

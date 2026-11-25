@@ -20,7 +20,7 @@
         </form>
     </section>
 
-    <section class="dashboard-section settings-card" id="notifications">
+    {% if not is_admin %}<section class="dashboard-section settings-card" id="notifications">
         <div class="settings-card-intro"><h2>Notifications</h2><p>Pick which updates appear in your inbox.</p></div>
         <form method="post" class="settings-form">{% csrf_token %}<input type="hidden" name="action" value="notifications">
             {% for field in notification_form %}
@@ -31,7 +31,7 @@
             {% endfor %}
             <div class="settings-actions"><button class="button button-primary" type="submit">Save preferences</button></div>
         </form>
-    </section>
+    </section>{% endif %}
 
     <section class="dashboard-section settings-card" id="devices">
         <div class="settings-card-intro"><h2>Sign-in &amp; devices</h2><p>Browsers where you’re signed in right now. Sign out anything you don’t recognise.</p></div>
@@ -60,17 +60,17 @@
         </form>
     </section>
 
-    <section class="dashboard-section settings-card danger-card">
+    {% if not is_admin %}<section class="dashboard-section settings-card danger-card">
         <div class="settings-card-intro"><h2>Delete account</h2><p>Permanently removes your account, your trips and everything in them. This can’t be undone.</p></div>
         <div class="settings-actions"><button class="button button-danger" type="button" data-dialog-open="delete-dialog">Delete account…</button></div>
-    </section>
+    </section>{% endif %}
 </div>
 
-<dialog class="modal" id="delete-dialog" aria-labelledby="delete-dialog-title"{% if delete_form.errors %} data-open-on-load{% endif %}>
+{% if not is_admin %}<dialog class="modal" id="delete-dialog" aria-labelledby="delete-dialog-title"{% if delete_form.errors %} data-open-on-load{% endif %}>
     <form method="post" class="modal-body">{% csrf_token %}<input type="hidden" name="action" value="delete">
         <div class="modal-head"><div><h2 id="delete-dialog-title">Delete your account?</h2><p>Your trips, checklists and itineraries will be permanently deleted.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
         {% for field in delete_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
         <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-danger" type="submit">Delete permanently</button></div>
     </form>
-</dialog>
+</dialog>{% endif %}
 {% endblock %}

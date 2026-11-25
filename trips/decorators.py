@@ -5,8 +5,8 @@ from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
 
-def role_required(role):
-    """Require login and one explicit account role for a dashboard view."""
+def role_required(*roles):
+    """Require login and one of the given account roles for a dashboard view."""
     def decorator(view_func):
         @login_required
         @wraps(view_func)
@@ -15,8 +15,8 @@ def role_required(role):
             if cache.add(f'trip-status-sync-{timezone.localdate()}', True, 60 * 60 * 24):
                 from .models import sync_trip_statuses
                 sync_trip_statuses()
-            if request.user.role != role:
-                if request.user.role == request.user.Role.ADMINISTRATOR and role == request.user.Role.TRAVELER:
+            if request.user.role not in roles:
+                if request.user.role == request.user.Role.ADMINISTRATOR and request.user.Role.TRAVELER in roles:
                     from django.shortcuts import redirect
                     return redirect('admin_dashboard')
                 raise PermissionDenied

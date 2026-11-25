@@ -1,0 +1,24 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Trips | Wunderlust admin{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">OVERSIGHT</p><h1>Trips</h1><p class="page-subtitle">Every trip on Wunderlust. Open one to see its plan, members and flights.</p></div></div>
+<section class="dashboard-section admin-section">
+    <form class="filter-bar" method="get">
+        <label class="search-field"><span class="sr-only">Search trips</span><input type="search" name="q" value="{{ query }}" placeholder="Destination, country or owner" maxlength="80"></label>
+        <label><span class="sr-only">Status</span><select name="status"><option value="">All statuses</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label><span class="sr-only">Type</span><select name="kind"><option value="">Solo and group</option><option value="solo" {% if kind == 'solo' %}selected{% endif %}>Solo</option><option value="group" {% if kind == 'group' %}selected{% endif %}>Group</option></select></label>
+        <button class="button button-secondary" type="submit">Apply</button>
+    </form>
+    <div class="table-wrap"><table>
+        <thead><tr><th>Destination</th><th>Owner</th><th>Dates</th><th>Type</th><th>Status</th></tr></thead>
+        <tbody>{% for trip in page_obj %}<tr>
+            <td><a href="{% url 'admin_trip_detail' trip.pk %}"><strong>{{ trip.destination }}</strong></a>{% if trip.country %}<small class="table-secondary">{{ trip.country }}</small>{% endif %}</td>
+            <td><a href="{% url 'admin_user_detail' trip.owner_id %}">@{{ trip.owner.username }}</a></td>
+            <td>{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}</td>
+            <td>{% if trip.group_size %}Group · {{ trip.group_size }}{% else %}Solo{% endif %}</td>
+            <td><span class="status-pill status-{{ trip.status|lower }}">{{ trip.get_status_display }}</span></td>
+        </tr>{% empty %}<tr><td colspan="5" class="table-empty">No trips match those filters.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% include 'dashboard/admin/_pagination.html' %}
+</section>
+{% endblock %}

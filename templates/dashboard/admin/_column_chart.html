@@ -1,0 +1,3 @@
+<div class="column-chart" role="img" aria-label="{{ label }}: {% for p in series %}{{ p.full }} {{ p.value }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+    {% for p in series %}<div class="column" tabindex="0"><span class="column-tip">{{ p.full }} · {{ p.value }}</span><span class="column-value">{{ p.value }}</span><span class="column-bar" style="height:{{ p.pct }}%"></span><span class="column-label">{{ p.label }}</span></div>{% endfor %}
+</div>

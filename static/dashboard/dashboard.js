@@ -683,3 +683,23 @@ function assertJson(response) {
   // Keyboard users: bring it back when focus moves into it.
   nav.addEventListener('focusin', () => body.classList.remove('nav-hidden'));
 })();
+
+// Admin: ask before destructive form submissions (forms marked data-confirm).
+document.addEventListener('submit', (event) => {
+  const form = event.target;
+  if (form instanceof HTMLFormElement && form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}, true);
+
+// Admin notices: only show the username field when sending to one traveler.
+document.querySelectorAll('[data-notice-form]').forEach((form) => {
+  const field = form.querySelector('[data-recipient-field]');
+  const sync = () => {
+    const choice = form.querySelector('input[name$="audience"]:checked');
+    if (field) field.hidden = !choice || choice.value !== 'one';
+  };
+  form.addEventListener('change', sync);
+  sync();
+});

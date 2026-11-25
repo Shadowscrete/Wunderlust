@@ -17,6 +17,7 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
+from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .recommendations import ideas_for
 from .flight_status import FlightStatusError, get_flight_status, is_trackable
@@ -83,10 +84,20 @@ def _accessible_trips(user):
 
 
 def _notification_scope(user):
-    """Notifications a user should see: their own, plus system-wide notices unless they turned those off."""
-    if get_user_prefs(user)['notify_system']:
+    """Notifications a user should see: their own, plus system-wide notices unless they turned those off.
+    Administrators only get their own (e.g. new reports); system notices are written for travelers."""
+    if user.role == User.Role.TRAVELER and get_user_prefs(user)['notify_system']:
         return Q(user=user) | Q(user__isnull=True)
     return Q(user=user)
+
+
+def _with_read_state(queryset, user):
+    """Annotate `read_by_me`: own rows use is_read, shared notices use a per-user read marker."""
+    return queryset.annotate(seen=Exists(NotificationRead.objects.filter(notification=OuterRef('pk'), user=user)))
+
+
+def _is_read(item):
+    return item.is_read if item.user_id else item.seen
 
 
 def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_updates'):
@@ -516,7 +527,8 @@ def activity_list(request):
             created_at__date__lt=timezone.localdate(),
             created_at__date__gte=cutoff,
         ).select_related('trip')
-        for notification in notifications:
+        for notification in _with_read_state(notifications, request.user):
+            notification.is_read = _is_read(notification)
             when = timezone.localtime(notification.created_at).replace(tzinfo=None)
             entries.append({'kind': 'notification', 'when': when, 'has_time': True, 'item': notification})
 
@@ -525,104 +537,46 @@ def activity_list(request):
     return render(request, 'dashboard/activities.html', {'page_obj': page, 'kind': kind})
 
 
-@role_required(User.Role.TRAVELER)
+@role_required(User.Role.TRAVELER, User.Role.ADMINISTRATOR)
 def live_notification_count(request):
-    day_notifications = Notification.objects.filter(
+    day_notifications = _with_read_state(Notification.objects.filter(
         _notification_scope(request.user),
         created_at__date=timezone.localdate(),
-    ).select_related('trip').order_by('-created_at')
-    notifications = [{
-        'id': item.pk,
-        'title': item.title,
-        'message': item.message,
-        'is_read': item.is_read,
-        'time': timezone.localtime(item.created_at).strftime('%I:%M %p').lstrip('0') if item.created_at else '',
-        'trip': item.trip.destination if item.trip_id else '',
-        'can_mark_read': item.user_id == request.user.pk and not item.is_read,
-        'mark_url': reverse('notification_mark_read', kwargs={'notification_id': item.pk}),
-    } for item in day_notifications[:30]]
-    unread_count = day_notifications.filter(is_read=False).count()
+    ), request.user).select_related('trip').order_by('-created_at')
+    notifications = []
+    unread_count = 0
+    for item in day_notifications[:30]:
+        is_read = _is_read(item)
+        unread_count += not is_read
+        notifications.append({
+            'id': item.pk,
+            'title': item.title,
+            'message': item.message,
+            'is_read': is_read,
+            'time': timezone.localtime(item.created_at).strftime('%I:%M %p').lstrip('0') if item.created_at else '',
+            'trip': item.trip.destination if item.trip_id else '',
+            'can_mark_read': not is_read,
+            'mark_url': reverse('notification_mark_read', kwargs={'notification_id': item.pk}),
+        })
     return JsonResponse({'count': unread_count, 'notifications': notifications})
 
 
-@role_required(User.Role.TRAVELER)
+@role_required(User.Role.TRAVELER, User.Role.ADMINISTRATOR)
 @require_POST
 def notification_mark_read(request, notification_id):
     notification = get_object_or_404(
-        Notification.objects.filter(user=request.user),
+        Notification.objects.filter(_notification_scope(request.user)),
         pk=notification_id,
-        created_at__date=timezone.localdate(),
     )
-    notification.is_read = True
-    notification.save(update_fields=('is_read',))
+    if notification.user_id:
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=('is_read',))
+    else:
+        NotificationRead.objects.get_or_create(notification=notification, user=request.user)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'is_read': True})
     next_url = request.POST.get('next') or request.META.get('HTTP_REFERER', '')
     if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         return redirect(next_url)
     return redirect('activity_list')
-
-
-@role_required(User.Role.ADMINISTRATOR)
-def admin_dashboard(request):
-    # Admin filtering is applied in the ORM before rendering; no full user table is loaded.
-    query = request.GET.get('q', '').strip()
-    role_filter = request.GET.get('role', '').strip()
-    user_status = request.GET.get('user_status', '').strip()
-    trip_status = request.GET.get('status', '').strip()
-    users = User.objects.all().order_by('-date_joined')
-    if query:
-        users = users.filter(Q(username__icontains=query) | Q(email__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query))
-    if role_filter in User.Role.values:
-        users = users.filter(role=role_filter)
-    if user_status == 'active':
-        users = users.filter(is_active=True)
-    elif user_status == 'inactive':
-        users = users.filter(is_active=False)
-
-    trips = Trip.objects.select_related('owner').annotate(group_size=Count('group_trip__members', distinct=True)).order_by('start_date')
-    if query:
-        trips = trips.filter(Q(destination__icontains=query) | Q(owner__username__icontains=query) | Q(owner__email__icontains=query))
-    if trip_status in Trip.Status.values:
-        trips = trips.filter(status=trip_status)
-
-    checklist_stats = Checklist.objects.aggregate(total=Count('id', distinct=True), complete=Count('id', distinct=True, filter=Q(checks__user=F('trip__owner'))))
-    total_checklist = checklist_stats['total'] or 0
-    complete_checklist = checklist_stats['complete'] or 0
-    completion_rate = round(complete_checklist * 100 / total_checklist) if total_checklist else 0
-
-    travel_form = TravelInfoForm(prefix='travel')
-    notification_form = SystemNotificationForm(prefix='notice')
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'save_travel_info':
-            travel_form = TravelInfoForm(request.POST, prefix='travel')
-            if travel_form.is_valid():
-                travel_form.save()
-                messages.success(request, 'Travel information saved.')
-                return redirect('admin_dashboard')
-        elif action == 'save_notification':
-            notification_form = SystemNotificationForm(request.POST, prefix='notice')
-            if notification_form.is_valid():
-                notification_form.save()
-                messages.success(request, 'System notification created.')
-                return redirect('admin_dashboard')
-
-    return render(request, 'dashboard/admin.html', {
-        'total_users': User.objects.count(),
-        'active_trips': Trip.objects.filter(status__in=(Trip.Status.PLANNING, Trip.Status.READY, Trip.Status.IN_PROGRESS)).count(),
-        'completion_rate': completion_rate,
-        'pending_notifications': Notification.objects.filter(is_read=False, user__isnull=False).count(),
-        'users': users[:8],
-        'trips': trips[:8],
-        'travel_info_entries': TravelInfo.objects.select_related('trip')[:6],
-        'notifications': Notification.objects.select_related('user', 'trip')[:6],
-        'travel_form': travel_form,
-        'notification_form': notification_form,
-        'query': query,
-        'role_filter': role_filter,
-        'user_status': user_status,
-        'trip_status': trip_status,
-        'role_choices': User.Role.choices,
-        'trip_status_choices': Trip.Status.choices,
-    })

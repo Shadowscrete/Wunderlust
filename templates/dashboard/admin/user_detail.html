@@ -1,0 +1,48 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}@{{ person.username }} | Wunderlust admin{% endblock %}
+{% block content %}
+<p class="back-link"><a href="{% url 'admin_users' %}">← All users</a></p>
+<section class="profile-hero public-hero">
+    <div class="profile-hero-avatar person-avatar-lg"><span>{{ person_initials }}</span>{% if person_avatar %}<img src="{{ person_avatar }}" alt="" data-avatar-img>{% endif %}</div>
+    <div class="profile-hero-copy">
+        <p class="eyebrow">{{ person.get_role_display|upper }}</p>
+        <h1>{{ person.get_full_name|default:person.username }}</h1>
+        <p class="profile-hero-meta">@{{ person.username }}<span>·</span>Joined {{ person.date_joined|date:"M j, Y" }}<span>·</span>Last sign-in {{ person.last_login|date:"M j, Y"|default:"never" }}</p>
+        <ul class="public-stats">
+            <li><span class="status-pill {% if person.is_active %}status-ready{% else %}status-cancelled{% endif %}">{% if person.is_active %}Active{% else %}Deactivated{% endif %}</span></li>
+            <li><strong>{{ person.trip_count }}</strong> trip{{ person.trip_count|pluralize }} owned</li>
+            <li><strong>{{ person.total_reports }}</strong> time{{ person.total_reports|pluralize }} reported ({{ person.open_reports }} open)</li>
+            <li><strong>{{ reports_made }}</strong> report{{ reports_made|pluralize }} filed</li>
+            <li><strong>{{ device_count }}</strong> signed-in device{{ device_count|pluralize }}</li>
+        </ul>
+        {% if person.email %}<p class="table-secondary">{{ person.email }}</p>{% endif %}
+    </div>
+    <div class="public-actions">
+        {% if person.role == 'TRAVELER' and person.is_active %}<a class="button button-secondary" href="{% url 'public_profile' person.username %}">View public profile</a>{% endif %}
+    </div>
+</section>
+
+{% if is_self %}<p class="empty-inline">This is your account. Manage it from Settings.</p>{% else %}
+<section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">ACCESS</p><h2>Manage account</h2></div></div>
+    <div class="admin-actions">
+        {% if person.is_active %}{% if person.role != 'ADMINISTRATOR' %}<form method="post" action="{% url 'admin_user_action' person.pk %}" data-confirm="Deactivate @{{ person.username }}? They will be signed out everywhere and can't sign in until reactivated.">{% csrf_token %}<input type="hidden" name="action" value="deactivate"><button class="button button-danger-outline" type="submit">Deactivate account</button></form>{% endif %}
+        {% else %}<form method="post" action="{% url 'admin_user_action' person.pk %}">{% csrf_token %}<input type="hidden" name="action" value="activate"><button class="button button-primary" type="submit">Reactivate account</button></form>{% endif %}
+        <form method="post" action="{% url 'admin_user_action' person.pk %}" class="inline-form" data-confirm="Change the role of @{{ person.username }}? They will be signed out so the change takes effect.">{% csrf_token %}<input type="hidden" name="action" value="set_role">
+            <label><span class="sr-only">Role</span><select name="role">{% for value, label in role_choices %}<option value="{{ value }}" {% if person.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <button class="button button-secondary" type="submit">Change role</button></form>
+    </div>
+</section>{% endif %}
+
+<section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">MODERATION</p><h2>Reports about this user</h2></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Reason</th><th>Details</th><th>Reported by</th><th>Status</th><th>Date</th></tr></thead><tbody>
+    {% for report in reports %}<tr><td>{{ report.get_reason_display }}</td><td>{{ report.details|default:"—"|truncatechars:140 }}</td><td>{% if report.reporter %}<a href="{% url 'admin_user_detail' report.reporter_id %}">@{{ report.reporter.username }}</a>{% else %}<span class="table-secondary">Deleted account</span>{% endif %}</td><td><span class="status-pill report-{{ report.status|lower }}">{{ report.get_status_display }}</span></td><td>{{ report.created_at|date:"M j, Y" }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="table-empty">No reports about this user.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+
+<section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">TRAVEL</p><h2>Trips</h2></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Destination</th><th>Owner</th><th>Dates</th><th>Status</th></tr></thead><tbody>
+    {% for trip in trips_page %}<tr><td><a href="{% url 'admin_trip_detail' trip.pk %}"><strong>{{ trip.destination }}</strong></a></td><td>{% if trip.owner_id == person.pk %}Owner{% else %}@{{ trip.owner.username }}{% endif %}</td><td>{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}</td><td><span class="status-pill status-{{ trip.status|lower }}">{{ trip.get_status_display }}</span></td></tr>
+    {% empty %}<tr><td colspan="4" class="table-empty">No trips.</td></tr>{% endfor %}</tbody></table></div>
+    {% include 'dashboard/admin/_pagination.html' with page_obj=trips_page %}
+</section>
+{% endblock %}

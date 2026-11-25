@@ -1,0 +1,16 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Travel information | Wunderlust admin{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">REFERENCE LIBRARY</p><h1>Travel information</h1><p class="page-subtitle">Shared guidance travelers see for their destinations. Travelers' private trip notes are not listed here.</p></div></div>
+<div class="admin-lower-grid">
+    <section class="dashboard-section admin-section" id="entry-form"><div class="section-heading"><div><p class="eyebrow">{% if entry %}EDITING{% else %}NEW ENTRY{% endif %}</p><h2>{% if entry %}{{ entry.title }}{% else %}Add travel information{% endif %}</h2></div>{% if entry %}<a class="text-button" href="{% url 'admin_travel_info' %}">Cancel</a>{% endif %}</div>
+        <form method="post" class="management-form">{% csrf_token %}<input type="hidden" name="action" value="save">{{ form.as_p }}<button class="button button-primary" type="submit">{% if entry %}Save changes{% else %}Save travel entry{% endif %}</button></form>
+        {% if entry %}<form method="post" class="management-form" data-confirm="Delete this travel entry?">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="button button-danger-outline" type="submit">Delete entry</button></form>{% endif %}
+    </section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">LIBRARY</p><h2>Entries</h2></div></div>
+        <form class="filter-bar" method="get"><label class="search-field"><span class="sr-only">Search entries</span><input type="search" name="q" value="{{ query }}" placeholder="Title, destination or text" maxlength="80"></label><button class="button button-secondary" type="submit">Search</button></form>
+        <div class="admin-entry-list">{% for item in page_obj %}<article><span class="info-category">{{ item.get_category_display|slice:":1" }}</span><div><strong><a href="{% url 'admin_travel_info_edit' item.pk %}#entry-form">{{ item.title }}</a></strong><small>{{ item.get_category_display }} · {{ item.destination|default:"General reference" }} · updated {{ item.updated_at|date:"M j, Y" }}</small></div></article>{% empty %}<p class="empty-inline">No travel information entries yet.</p>{% endfor %}</div>
+        {% include 'dashboard/admin/_pagination.html' %}
+    </section>
+</div>
+{% endblock %}

@@ -15,8 +15,13 @@
         </ul>
     </div>
     <div class="public-actions">
+        {% if viewer_is_admin %}
+        <a class="button button-secondary" href="{% url 'admin_user_detail' person.pk %}">Manage account</a>
+        {% if open_reports %}<a class="text-button" href="{% url 'admin_reports' %}">{{ open_reports }} open report{{ open_reports|pluralize }}</a>{% endif %}
+        {% else %}
         {% include 'accounts/_follow_button.html' with username=person.get_username i_follow=rel.i_follow follows_me=rel.follows_me is_friend=rel.is_friend %}
         <button class="text-button report-link" type="button" data-dialog-open="report-dialog">Report</button>
+        {% endif %}
     </div>
 </section>
 
@@ -48,12 +53,12 @@
     </section>
 </div>
 
-<dialog class="modal" id="report-dialog" aria-labelledby="report-title">
+{% if report_form %}<dialog class="modal" id="report-dialog" aria-labelledby="report-title">
     <form method="post" action="{% url 'report_user' person.get_username %}" class="modal-body">{% csrf_token %}
         <div class="modal-head"><div><h2 id="report-title">Report @{{ person.get_username }}</h2><p>Reports are private. {{ person.get_full_name|default:person.get_username }} won’t know who reported them.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
         <fieldset class="report-reasons"><legend>{{ report_form.reason.label }}</legend>{% for radio in report_form.reason %}<label class="report-reason">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}</fieldset>
         <div class="form-field">{{ report_form.details.label_tag }}{{ report_form.details }}</div>
         <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-danger" type="submit">Send report</button></div>
     </form>
-</dialog>
+</dialog>{% endif %}
 {% endblock %}

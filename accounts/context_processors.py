@@ -36,4 +36,17 @@ def user_prefs(request):
     if not user or not user.is_authenticated:
         return {}
     prefs = get_user_prefs(user)
-    return {'avatar_url': prefs['avatar_url'], 'user_theme': prefs['theme']}
+    context = {'avatar_url': prefs['avatar_url'], 'user_theme': prefs['theme']}
+    if user.role == user.Role.ADMINISTRATOR:
+        context['admin_open_reports'] = open_report_count()
+    return context
+
+
+def open_report_count():
+    """Sidebar badge for administrators. One shared number (no personal data), cached for a minute."""
+    count = cache.get('admin-open-reports')
+    if count is None:
+        from .models import Report
+        count = Report.objects.filter(status=Report.Status.OPEN).count()
+        cache.set('admin-open-reports', count, 60)
+    return count

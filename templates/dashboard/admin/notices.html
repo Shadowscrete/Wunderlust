@@ -1,0 +1,26 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Notices | Wunderlust admin{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">SYSTEM NOTICES</p><h1>Notices</h1><p class="page-subtitle">Send an announcement to every traveler or a message to one traveler. It appears in their notification inbox.</p></div></div>
+<div class="admin-lower-grid">
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">COMPOSE</p><h2>New notice</h2></div></div>
+        <form method="post" class="management-form" data-notice-form>{% csrf_token %}<input type="hidden" name="action" value="send">
+            {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+            <fieldset class="audience-choice"><legend>Send to</legend>{% for radio in form.audience %}<label>{{ radio.tag }} {{ radio.choice_label }}</label>{% endfor %}</fieldset>
+            <p data-recipient-field>{{ form.recipient.label_tag }}{{ form.recipient }}{% for error in form.recipient.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</p>
+            <p>{{ form.title.label_tag }}{{ form.title }}{% for error in form.title.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</p>
+            <p>{{ form.message.label_tag }}{{ form.message }}</p>
+            <p class="helptext">“All travelers” reaches {{ traveler_count }} active traveler{{ traveler_count|pluralize }}, except those who turned off notices from Wunderlust.</p>
+            <button class="button button-primary" type="submit">Send notice</button>
+        </form>
+    </section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">SENT</p><h2>Recent notices</h2></div></div>
+        <div class="admin-entry-list">{% for notice in page_obj %}<article>
+            <span class="notification-dot{% if notice.user_id and notice.is_read %} read{% endif %}"></span>
+            <div><strong>{{ notice.title }}</strong><small>{% if notice.user_id %}To @{{ notice.user.username }} · {% if notice.is_read %}read{% else %}unread{% endif %}{% else %}All travelers · read by {{ notice.read_count }}{% endif %} · {{ notice.created_at|date:"M j, Y g:i A" }}</small>{% if notice.message %}<small>{{ notice.message|truncatechars:160 }}</small>{% endif %}</div>
+            <form method="post" data-confirm="Delete this notice? Travelers will no longer see it.">{% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="notice" value="{{ notice.pk }}"><button class="text-button" type="submit" aria-label="Delete notice">Delete</button></form>
+        </article>{% empty %}<p class="empty-inline">No notices sent yet.</p>{% endfor %}</div>
+        {% include 'dashboard/admin/_pagination.html' %}
+    </section>
+</div>
+{% endblock %}

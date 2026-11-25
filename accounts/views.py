@@ -61,6 +61,8 @@ def login_success(request):
 
 @login_required
 def profile(request):
+    if request.user.role == request.user.Role.ADMINISTRATOR:
+        return redirect('admin_dashboard')  # administrators don't have a traveler profile
     from django.db.models import Count, Q
     from django.utils import timezone
     from trips.models import Trip
@@ -102,8 +104,11 @@ def account_settings(request):
     password_form = PasswordChangeForm(user)
     delete_form = DeleteAccountForm(user=user)
 
+    is_admin = user.role == user.Role.ADMINISTRATOR
     if request.method == 'POST':
         action = request.POST.get('action')
+        if is_admin and action in ('notifications', 'delete'):
+            return redirect('account_settings')  # traveler-only settings
         if action == 'appearance':
             appearance_form = AppearanceForm(request.POST, instance=profile)
             if appearance_form.is_valid():
@@ -153,6 +158,7 @@ def account_settings(request):
         'delete_form': delete_form,
         'devices': devices,
         'other_device_count': sum(1 for d in devices if not d['is_current']),
+        'is_admin': is_admin,
     })
 
 @login_required
@@ -213,7 +219,7 @@ from .models import User  # noqa: E402
 TRAVELER = User.Role.TRAVELER
 
 
-@role_required(TRAVELER)
+@role_required(TRAVELER, User.Role.ADMINISTRATOR)
 def user_search(request):
     """Live search for the header: up to 8 travelers matching every word typed."""
     query = ' '.join(request.GET.get('q', '').split())[:60]
@@ -239,9 +245,10 @@ def _discoverable_or_404(username):
     return get_object_or_404(discoverable_users().select_related('profile'), username__iexact=username)
 
 
-@role_required(TRAVELER)
+@role_required(TRAVELER, User.Role.ADMINISTRATOR)
 def public_profile(request, username):
     person = _discoverable_or_404(username)
+    viewer_is_admin = request.user.role == User.Role.ADMINISTRATOR
     if person.pk == request.user.pk:
         return redirect('profile')
     from django.db.models import Count, Q
@@ -264,12 +271,14 @@ def public_profile(request, username):
         'person_avatar': avatar_url_for(person),
         'person_initials': initials_for(person),
         'person_profile': getattr(person, 'profile', None) if hasattr(person, 'profile') else None,
-        'rel': relationship(request.user, person),
+        'rel': {} if viewer_is_admin else relationship(request.user, person),
+        'viewer_is_admin': viewer_is_admin,
+        'open_reports': Report.objects.filter(reported_user=person, status=Report.Status.OPEN).count() if viewer_is_admin else 0,
         'stats': stats,
         'visited_countries': visited_countries,
         'followers_count': Follow.objects.filter(following=person).count(),
         'following_count': Follow.objects.filter(follower=person).count(),
-        'report_form': ReportForm(),
+        'report_form': None if viewer_is_admin else ReportForm(),
     })
 
 
@@ -312,6 +321,8 @@ def report_user(request, username):
         report = form.save(commit=False)
         report.reporter, report.reported_user = request.user, person
         report.save()
+        from trips.admin_views import notify_admins_of_report
+        notify_admins_of_report(report)
         messages.success(request, 'Thanks for letting us know. Our team will review this report.')
     return redirect('public_profile', username=person.get_username())
 

@@ -172,10 +172,33 @@ class TravelInfoForm(forms.ModelForm):
 
 
 class SystemNotificationForm(forms.ModelForm):
+    """A notice from the Wunderlust team: to every traveler (one shared row) or to one traveler."""
+    AUDIENCE_ALL, AUDIENCE_ONE = 'all', 'one'
+    audience = forms.ChoiceField(choices=((AUDIENCE_ALL, 'All travelers'), (AUDIENCE_ONE, 'One traveler')), initial=AUDIENCE_ALL, widget=forms.RadioSelect)
+    recipient = forms.CharField(required=False, max_length=150, label='Traveler username', help_text='Only for a notice to one traveler.')
+
     class Meta:
         model = Notification
         fields = ('title', 'message')
-        widgets = {'message': forms.Textarea(attrs={'rows': 2})}
+        widgets = {'message': forms.Textarea(attrs={'rows': 3})}
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('audience') == self.AUDIENCE_ONE:
+            from accounts.social import discoverable_users
+            name = (cleaned.get('recipient') or '').strip().lstrip('@')
+            person = discoverable_users().filter(username__iexact=name).only('pk').first() if name else None
+            if person is None:
+                self.add_error('recipient', 'Enter the username of an active traveler.')
+            cleaned['recipient_user'] = person
+        return cleaned
+
+    def save(self, commit=True):
+        notice = super().save(commit=False)
+        notice.user = self.cleaned_data.get('recipient_user') if self.cleaned_data.get('audience') == self.AUDIENCE_ONE else None
+        if commit:
+            notice.save()
+        return notice
 
 
 FLIGHT_NUMBER_RE = re.compile(r'^([A-Z0-9]{2})\s*-?\s*(\d{1,4})([A-Z]?)$')

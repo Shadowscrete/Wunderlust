@@ -1,10 +1,22 @@
 from django.urls import path
-from . import views
+from . import admin_views, views
 
 urlpatterns = [
     path('', views.dashboard_home, name='dashboard_home'),
     path('traveler/', views.traveler_dashboard, name='traveler_dashboard'),
-    path('admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('admin/', admin_views.admin_dashboard, name='admin_dashboard'),
+    path('admin/users/', admin_views.admin_users, name='admin_users'),
+    path('admin/users/<int:user_id>/', admin_views.admin_user_detail, name='admin_user_detail'),
+    path('admin/users/<int:user_id>/action/', admin_views.admin_user_action, name='admin_user_action'),
+    path('admin/trips/', admin_views.admin_trips, name='admin_trips'),
+    path('admin/trips/<int:trip_id>/', admin_views.admin_trip_detail, name='admin_trip_detail'),
+    path('admin/trips/<int:trip_id>/action/', admin_views.admin_trip_action, name='admin_trip_action'),
+    path('admin/reports/', admin_views.admin_reports, name='admin_reports'),
+    path('admin/reports/<int:report_id>/action/', admin_views.admin_report_action, name='admin_report_action'),
+    path('admin/travel-information/', admin_views.admin_travel_info, name='admin_travel_info'),
+    path('admin/travel-information/<int:entry_id>/', admin_views.admin_travel_info, name='admin_travel_info_edit'),
+    path('admin/notices/', admin_views.admin_notices, name='admin_notices'),
+    path('admin/inbox/', admin_views.admin_inbox, name='admin_inbox'),
     path('trips/', views.trip_list, name='trip_list'),
     path('preparation/', views.preparation_overview, name='preparation_overview'),
     path('travel-information/', views.travel_information_overview, name='travel_information_overview'),

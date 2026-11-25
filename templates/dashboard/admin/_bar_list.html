@@ -1,0 +1,1 @@
+{% if rows %}<ul class="bar-list" role="list">{% for row in rows %}<li title="{{ row.label }}: {{ row.value }}"><span class="bar-label">{{ row.label }}</span><span class="bar-track"><span class="bar-fill" style="width:{{ row.pct }}%"></span></span><span class="bar-value">{{ row.value }}</span></li>{% endfor %}</ul>{% else %}<p class="empty-inline">{{ empty }}</p>{% endif %}

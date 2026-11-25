@@ -1,0 +1,38 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Reports | Wunderlust admin{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">MODERATION</p><h1>Reports</h1><p class="page-subtitle">Reports travelers have filed about other travelers. Reporters stay anonymous to the person reported.</p></div></div>
+
+{% if most_reported %}<section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">MOST REPORTED</p><h2>Open reports by traveler</h2></div></div>
+    <div class="admin-entry-list">{% for person in most_reported %}<article><span class="report-count has-open">{{ person.open_reports }}×</span><div><strong><a href="{% url 'admin_user_detail' person.pk %}">@{{ person.username }}</a></strong><small>{% if person.is_active %}Active{% else %}Deactivated{% endif %}</small></div></article>{% endfor %}</div>
+</section>{% endif %}
+
+<section class="dashboard-section admin-section">
+    <form class="filter-bar" method="get">
+        <label><span class="sr-only">Status</span><select name="status"><option value="all" {% if not status %}selected{% endif %}>All statuses</option>{% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label><span class="sr-only">Reason</span><select name="reason"><option value="">All reasons</option>{% for value, label in reason_choices %}<option value="{{ value }}" {% if reason == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <button class="button button-secondary" type="submit">Apply</button>
+    </form>
+    <div class="report-list">{% for report in page_obj %}
+        <article class="report-card">
+            <div class="report-card-head">
+                <div><strong><a href="{% url 'admin_user_detail' report.reported_user_id %}">@{{ report.reported_user.username }}</a></strong> <span class="report-count{% if report.times_reported > 1 %} has-open{% endif %}" title="Total times this traveler has been reported">reported {{ report.times_reported }}×</span>
+                    <small class="table-secondary">{{ report.get_reason_display }} · {{ report.created_at|date:"M j, Y g:i A" }} · by {% if report.reporter %}<a href="{% url 'admin_user_detail' report.reporter_id %}">@{{ report.reporter.username }}</a>{% else %}a deleted account{% endif %}</small></div>
+                <span class="status-pill report-{{ report.status|lower }}">{{ report.get_status_display }}</span>
+            </div>
+            {% if report.details %}<p class="report-details">{{ report.details }}</p>{% endif %}
+            <div class="admin-actions">
+                {% if report.status == 'OPEN' %}
+                <form method="post" action="{% url 'admin_report_action' report.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="review"><button class="button button-primary" type="submit">Mark reviewed</button></form>
+                <form method="post" action="{% url 'admin_report_action' report.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="dismiss"><button class="button button-secondary" type="submit">Dismiss</button></form>
+                {% if report.reported_user.is_active and report.reported_user.role == 'TRAVELER' %}<form method="post" action="{% url 'admin_report_action' report.pk %}" data-confirm="Deactivate @{{ report.reported_user.username }}? They will be signed out everywhere.">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="deactivate_user"><button class="button button-danger-outline" type="submit">Deactivate user</button></form>{% endif %}
+                {% else %}
+                <form method="post" action="{% url 'admin_report_action' report.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="action" value="reopen"><button class="text-button" type="submit">Reopen</button></form>
+                {% if report.reviewed_at %}<small class="table-secondary">Closed {{ report.reviewed_at|date:"M j, Y" }}</small>{% endif %}
+                {% endif %}
+            </div>
+        </article>
+    {% empty %}<p class="empty-inline">No reports match those filters.</p>{% endfor %}</div>
+    {% include 'dashboard/admin/_pagination.html' %}
+</section>
+{% endblock %}

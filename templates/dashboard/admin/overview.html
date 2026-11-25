@@ -1,0 +1,29 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Overview | Wunderlust admin{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">WUNDERLUST CONTROL ROOM</p><h1>Overview</h1><p class="page-subtitle">How travelers are using Wunderlust. Figures refresh every few minutes.</p></div>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="refresh"><button class="button button-secondary" type="submit">Refresh now</button></form></div>
+
+<section class="metric-grid" aria-label="Platform totals">
+    <article class="metric-card"><span class="metric-label">Travelers</span><strong>{{ stats.users.travelers }}</strong><small>{{ stats.users.new_30 }} joined in the last 30 days</small></article>
+    <article class="metric-card"><span class="metric-label">Active trips</span><strong>{{ stats.trips.active }}</strong><small>{{ stats.trips.total }} total · {{ stats.trips.group }} group</small></article>
+    <article class="metric-card"><span class="metric-label">Checklist completion</span><strong>{{ stats.completion_rate }}<small>%</small></strong><small>Items checked by trip owners</small></article>
+    <article class="metric-card"><span class="metric-label">Open reports</span><strong>{{ stats.open_reports }}</strong><small><a href="{% url 'admin_reports' %}">Review reports</a></small></article>
+</section>
+
+<div class="admin-chart-grid">
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">LAST 6 MONTHS</p><h2>New accounts</h2></div></div>
+        {% include 'dashboard/admin/_column_chart.html' with series=stats.signups label='New accounts per month' %}</section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">LAST 6 MONTHS</p><h2>Trips created</h2></div></div>
+        {% include 'dashboard/admin/_column_chart.html' with series=stats.trips_created label='Trips created per month' %}</section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">ALL TIME</p><h2>Popular destinations</h2></div></div>
+        {% include 'dashboard/admin/_bar_list.html' with rows=stats.destinations empty='No trips yet.' %}</section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">ALL TRIPS</p><h2>Trip status</h2></div></div>
+        {% include 'dashboard/admin/_bar_list.html' with rows=stats.statuses empty='No trips yet.' %}</section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">OPEN REPORTS</p><h2>Report reasons</h2></div></div>
+        {% include 'dashboard/admin/_bar_list.html' with rows=stats.report_reasons empty='No open reports.' %}</section>
+    <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">NEEDS ATTENTION</p><h2>Latest open reports</h2></div><a class="text-button" href="{% url 'admin_reports' %}">All reports</a></div>
+        <div class="admin-entry-list">{% for report in recent_reports %}<article><span class="info-category">!</span><div><strong><a href="{% url 'admin_user_detail' report.reported_user_id %}">@{{ report.reported_user.username }}</a></strong><small>{{ report.get_reason_display }} · {{ report.created_at|timesince }} ago</small></div></article>{% empty %}<p class="empty-inline">Nothing waiting for review.</p>{% endfor %}</div></section>
+</div>
+<p class="admin-footnote">Updated {{ stats.generated_at|date:"M j, g:i A" }}. {{ stats.users.inactive }} deactivated account{{ stats.users.inactive|pluralize }}.</p>
+{% endblock %}

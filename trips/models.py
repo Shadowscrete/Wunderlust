@@ -263,6 +263,18 @@ class Notification(models.Model):
         return self.title
 
 
+
+class NotificationRead(models.Model):
+    """Marks a system-wide notice (user=None) as read for one traveler.
+    One shared notice row plus a small read marker per reader, instead of copying the notice to every account."""
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE, related_name='reads')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+')
+    read_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('notification', 'user'), name='unique_notification_read')]
+
+
 def sync_trip_statuses():
     """Moves trips along by date: started trips become In progress, finished trips become Completed.
     Cancelled and already-completed trips are left alone. Two UPDATE queries in total."""

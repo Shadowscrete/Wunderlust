@@ -3,7 +3,6 @@ from django.utils import timezone
 
 from accounts.countries import COUNTRY_CHOICES
 
-from .airlines import AIRLINE_CHOICES, AIRLINE_NAMES, OTHER_AIRLINE
 import re
 from datetime import timedelta
 
@@ -12,10 +11,19 @@ from .models import Activity, Checklist, Flight, ItineraryDay, Notification, Tra
 
 class TripForm(forms.ModelForm):
     country = forms.ChoiceField(choices=COUNTRY_CHOICES, label='Country')
-    airline = forms.ChoiceField(choices=AIRLINE_CHOICES, required=False, label='Airline (optional)')
-    airline_other = forms.CharField(
-        required=False, max_length=120, label='Airline name',
-        widget=forms.TextInput(attrs={'placeholder': 'Type the airline’s name', 'data-other-for': 'id_airline'}),
+    has_ticket = forms.ChoiceField(
+        choices=(('no', 'Not yet, I’ll add it later'), ('yes', 'Yes, I have a flight number')),
+        initial='no', widget=forms.RadioSelect, label='Have you bought your plane ticket?',
+    )
+    flight_number = forms.CharField(
+        required=False, max_length=10, label='Flight number',
+        widget=forms.TextInput(attrs={'placeholder': 'e.g. PR 102', 'autocomplete': 'off', 'autocapitalize': 'characters', 'spellcheck': 'false'}),
+        help_text='Your outbound flight, as printed on your booking.',
+    )
+    flight_date = forms.DateField(
+        required=False, label='Flight departure date',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Leave blank to use the trip’s departure date.',
     )
     places = forms.CharField(
         required=False,
@@ -27,43 +35,25 @@ class TripForm(forms.ModelForm):
 
     class Meta:
         model = Trip
-        fields = ('destination', 'country', 'airline', 'start_date', 'end_date')
+        fields = ('destination', 'country', 'start_date', 'end_date')
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
             # data-min-from keeps the return picker from going earlier than the chosen departure.
             'end_date': forms.DateInput(attrs={'type': 'date', 'data-min-from': 'id_start_date'}),
         }
-        labels = {'destination': 'City', 'country': 'Country', 'airline': 'Airline (optional)'}
+        labels = {'destination': 'City', 'country': 'Country'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         today = timezone.localdate().isoformat()
         self.fields['start_date'].widget.attrs['min'] = today
         self.fields['end_date'].widget.attrs['min'] = today
-        # Keep "Airline name" right after the Airline dropdown.
-        order = list(self.fields)
-        order.remove('airline_other')
-        order.insert(order.index('airline') + 1, 'airline_other')
-        self.order_fields(order)
-
-    def clean_airline_other(self):
-        return ' '.join(self.cleaned_data.get('airline_other', '').split())
+        self.order_fields(['destination', 'country', 'start_date', 'end_date', 'has_ticket', 'flight_number', 'flight_date'])
 
     def clean(self):
         cleaned = super().clean()
         start_date = cleaned.get('start_date')
         end_date = cleaned.get('end_date')
-        # Airline: a listed name, a typed-in name for "Other", or blank.
-        airline = cleaned.get('airline', '')
-        if airline == OTHER_AIRLINE:
-            typed = cleaned.get('airline_other', '')
-            if not typed:
-                self.add_error('airline_other', 'Type the airline’s name, or pick one from the list.')
-            # A typed name that matches a listed airline is stored the same way as picking it.
-            match = next((name for name in AIRLINE_NAMES if name.lower() == typed.lower()), None)
-            cleaned['airline'] = match or typed
-        elif airline and airline not in AIRLINE_NAMES:
-            self.add_error('airline', 'Choose an airline from the list.')
         # Only new trips are created through this form, so departure can't already be in the past.
         # (When editing, a trip may keep the past departure date it already has.)
         if start_date and start_date < timezone.localdate() and start_date != getattr(self, 'original_start', None):
@@ -72,10 +62,38 @@ class TripForm(forms.ModelForm):
             self.add_error('end_date', 'The return date must be on or after the departure date.')
         if start_date and end_date and cleaned.get('generate_itinerary') and (end_date - start_date).days > 30:
             self.add_error('end_date', 'Suggested itineraries can cover trips up to 31 days. You can still create a longer trip without suggestions.')
+        self.flight = None
+        if cleaned.get('has_ticket') == 'yes':
+            self._clean_ticket(cleaned, start_date, end_date)
         return cleaned
+
+    def _clean_ticket(self, cleaned, start_date, end_date):
+        raw = cleaned.get('flight_number', '')
+        if not raw:
+            self.add_error('flight_number', 'Enter your flight number, or choose “Not yet”.')
+            return
+        try:
+            carrier_code, number = parse_flight_number(raw)
+        except forms.ValidationError as exc:
+            self.add_error('flight_number', exc)
+            return
+        flight_date = cleaned.get('flight_date') or start_date
+        if not flight_date:
+            return
+        # Flights can leave the day before the trip starts or land the day after it ends.
+        if start_date and end_date and not (start_date - timedelta(days=1) <= flight_date <= end_date + timedelta(days=1)):
+            self.add_error('flight_date', 'The flight date must be within a day of the trip dates.')
+            return
+        self.flight = (carrier_code, number, flight_date)
+
+
+# Flights have their own section with live status, so notes no longer offer a Flight category.
+NOTE_CATEGORY_CHOICES = [(v, l) for v, l in TravelInfo.Category.choices if v != TravelInfo.Category.FLIGHT]
 
 
 class TripTravelInfoForm(forms.ModelForm):
+    category = forms.ChoiceField(choices=NOTE_CATEGORY_CHOICES, initial=TravelInfo.Category.TRANSIT)
+
     class Meta:
         model = TravelInfo
         fields = ('category', 'title', 'details')
@@ -145,6 +163,8 @@ class ItineraryDayForm(forms.ModelForm):
 
 
 class TravelInfoForm(forms.ModelForm):
+    category = forms.ChoiceField(choices=NOTE_CATEGORY_CHOICES, initial=TravelInfo.Category.TRANSIT)
+
     class Meta:
         model = TravelInfo
         fields = ('destination', 'category', 'title', 'details')
@@ -159,6 +179,18 @@ class SystemNotificationForm(forms.ModelForm):
 
 
 FLIGHT_NUMBER_RE = re.compile(r'^([A-Z0-9]{2})\s*-?\s*(\d{1,4})([A-Z]?)$')
+
+
+def parse_flight_number(raw):
+    """'pr 0102' -> ('PR', '102'). Raises ValidationError for anything that isn't an IATA flight number."""
+    match = FLIGHT_NUMBER_RE.match(raw.upper().strip())
+    if not match:
+        raise forms.ValidationError('Enter a flight number like PR 102 or 5J560: the 2-character airline code, then up to 4 digits.')
+    code, digits, suffix = match.groups()
+    if code.isdigit():
+        raise forms.ValidationError('The airline code needs at least one letter, e.g. PR or 5J.')
+    # Leading zeros aren't part of the flight number (PR0102 is PR102).
+    return code, f'{int(digits)}{suffix}'
 
 
 class FlightForm(forms.ModelForm):
@@ -184,15 +216,7 @@ class FlightForm(forms.ModelForm):
         self.fields['flight_date'].widget.attrs.update({'min': self.earliest.isoformat(), 'max': self.latest.isoformat()})
 
     def clean_flight_number(self):
-        raw = self.cleaned_data['flight_number'].upper().strip()
-        match = FLIGHT_NUMBER_RE.match(raw)
-        if not match:
-            raise forms.ValidationError('Enter a flight number like PR 102 or 5J560: the 2-character airline code, then up to 4 digits.')
-        code, digits, suffix = match.groups()
-        if code.isdigit():
-            raise forms.ValidationError('The airline code needs at least one letter, e.g. PR or 5J.')
-        # Leading zeros aren't part of the flight number (PR0102 is PR102).
-        self.carrier_code, self.number = code, f'{int(digits)}{suffix}'
+        self.carrier_code, self.number = parse_flight_number(self.cleaned_data['flight_number'])
         return f'{self.carrier_code}{self.number}'
 
     def clean_flight_date(self):
@@ -229,12 +253,12 @@ class TripEditForm(TripForm):
     status = forms.ChoiceField(label='Status')
 
     class Meta(TripForm.Meta):
-        fields = ('destination', 'country', 'airline', 'start_date', 'end_date')
+        fields = ('destination', 'country', 'start_date', 'end_date')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        del self.fields['places']
-        del self.fields['generate_itinerary']
+        for name in ('places', 'generate_itinerary', 'has_ticket', 'flight_number', 'flight_date'):
+            del self.fields[name]
         trip = self.instance
         self.original_start = trip.start_date
         # In-progress / completed come from the dates; show the current one but only offer the editable ones.
@@ -244,19 +268,12 @@ class TripEditForm(TripForm):
         self.fields['status'].choices = choices
         self.fields['status'].initial = trip.status
         self.fields['status'].help_text = 'In progress and Completed are set automatically from the dates.'
-        # Airline: preselect a listed airline, otherwise "Other" with the saved name typed in.
-        if trip.airline:
-            if trip.airline in AIRLINE_NAMES:
-                self.initial['airline'] = trip.airline
-            else:
-                self.initial['airline'] = OTHER_AIRLINE
-                self.initial['airline_other'] = trip.airline
         # A trip that already started may keep its past departure date.
         earliest = min(self.original_start, timezone.localdate()).isoformat()
         self.fields['start_date'].widget.attrs['min'] = earliest
         self.fields['end_date'].widget.attrs['min'] = earliest
         self.fields['end_date'].help_text = 'Shortening the trip removes itinerary days outside the new dates.'
-        self.order_fields(['destination', 'country', 'airline', 'airline_other', 'start_date', 'end_date', 'status'])
+        self.order_fields(['destination', 'country', 'start_date', 'end_date', 'status'])
 
     def save(self, commit=True):
         trip = super().save(commit=False)

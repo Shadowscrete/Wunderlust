@@ -7,9 +7,24 @@
     <form method="post" class="feature-form">{% csrf_token %}
         {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
         <div class="form-grid">
-            {% for field in form %}<div class="form-field{% if field.name == 'places' %} full-field{% endif %}{% if field.name == 'generate_itinerary' %} full-field checkbox-field{% endif %}">{% if field.name != 'generate_itinerary' %}{{ field.label_tag }}{% endif %}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% if field.name == 'generate_itinerary' %}{{ field.label_tag }}{% endif %}</div>{% endfor %}
+            {% for field in form %}<div class="form-field{% if field.name == 'places' %} full-field{% endif %}{% if field.name == 'generate_itinerary' %} full-field checkbox-field{% endif %}{% if field.name == 'has_ticket' %} full-field ticket-choice{% endif %}{% if field.name == 'flight_number' or field.name == 'flight_date' %} ticket-field{% endif %}">{% if field.name != 'generate_itinerary' %}{{ field.label_tag }}{% endif %}{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}{% if field.name == 'generate_itinerary' %}{{ field.label_tag }}{% endif %}</div>{% endfor %}
         </div>
         {% if editing %}<div class="form-footer"><a class="button button-secondary" href="{% url 'trip_detail' trip.pk %}">Cancel</a><button class="button button-primary" type="submit">Save changes</button></div>{% else %}<div class="form-footer"><p>Four travel documents and five optional essentials will be added to your preparation checklist automatically.</p><button class="button button-primary" type="submit">Create trip <span aria-hidden="true">→︎</span></button></div>{% endif %}
     </form>
 </section>
+<script>
+(function () {
+    var radios = document.querySelectorAll('input[name="has_ticket"]');
+    if (!radios.length) return;
+    var fields = document.querySelectorAll('.ticket-field');
+    function sync() {
+        var picked = document.querySelector('input[name="has_ticket"]:checked');
+        var show = !!picked && picked.value === 'yes';
+        fields.forEach(function (f) { f.hidden = !show; });
+        document.getElementById('id_flight_number').required = show;
+    }
+    radios.forEach(function (r) { r.addEventListener('change', sync); });
+    sync();
+})();
+</script>
 {% endblock %}

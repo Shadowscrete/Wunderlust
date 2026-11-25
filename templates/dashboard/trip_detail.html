@@ -55,6 +55,7 @@
                     <span class="flight-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span>
                     <div class="flight-main"><strong class="flight-number">{{ flight.carrier_code }} {{ flight.number }}</strong><small>{% if flight.airline_name %}{{ flight.airline_name }}{% else %}Airline code {{ flight.carrier_code }}{% endif %}</small></div>
                     <div class="flight-when"><span class="flight-leg">{{ flight.get_leg_display }}</span><small>{{ flight.flight_date|date:"D, M j, Y" }}</small></div>
+                    <div class="flight-live" data-flight-status-url="{% url 'flight_status' trip.pk flight.pk %}" aria-live="polite"><button type="button" class="text-button flight-live-check">Check live status</button><small class="flight-live-msg"></small></div>
                     <form method="post" class="flight-remove">{% csrf_token %}<input type="hidden" name="action" value="delete_flight"><input type="hidden" name="flight_id" value="{{ flight.pk }}"><button class="text-button" type="submit" aria-label="Remove flight {{ flight.flight_number }}">Remove</button></form>
                 </article>{% empty %}<p class="empty-inline">No flights yet. Add your flight number so everyone on the trip has it in one place.</p>{% endfor %}
                 <form method="post" class="feature-form compact-form flight-form">{% csrf_token %}<input type="hidden" name="action" value="add_flight">
@@ -63,9 +64,52 @@
                     <div class="flight-form-actions"><button class="button button-primary" type="submit">Add flight</button></div>
                 </form>
             </section>
-        <section class="dashboard-section detail-section"><div class="section-heading"><div><p class="eyebrow">TRIP NOTES</p><h2>Travel information</h2></div></div>{% for info in travel_info %}<article class="travel-info-entry"><div><span>{{ info.get_category_display }}</span><strong>{{ info.title }}</strong><p>{{ info.details|linebreaksbr }}</p></div></article>{% empty %}<p class="empty-inline">Add flight, transit, guide or other details as they become available.</p>{% endfor %}
+        <section class="dashboard-section detail-section"><div class="section-heading"><div><p class="eyebrow">TRIP NOTES</p><h2>Travel information</h2></div></div>{% for info in travel_info %}<article class="travel-info-entry"><div><span>{{ info.get_category_display }}</span><strong>{{ info.title }}</strong><p>{{ info.details|linebreaksbr }}</p></div></article>{% empty %}<p class="empty-inline">Add transit, guide or other details as they become available.</p>{% endfor %}
             <form method="post" class="feature-form compact-form">{% csrf_token %}<input type="hidden" name="action" value="add_travel_info">{% for field in travel_info_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}<button class="button button-secondary" type="submit">Save trip information</button></form>
         </section>
 </div>
 </div>
+<script>
+(function () {
+    function fmt(iso) {
+        if (!iso) return '';
+        // AviationStack sends airport-local times labelled +00:00; show the clock time as given.
+        var m = iso.match(/T(\d{2}):(\d{2})/);
+        return m ? m[1] + ':' + m[2] : '';
+    }
+    function side(label, s) {
+        var time = fmt(s.actual) || fmt(s.estimated) || fmt(s.scheduled);
+        var bits = [label + ' ' + (s.iata || '?') + (time ? ' ' + time : '')];
+        if (s.terminal) bits.push('T' + s.terminal);
+        if (s.gate) bits.push('Gate ' + s.gate);
+        if (s.delay) bits.push('+' + s.delay + ' min');
+        return bits.join(' · ');
+    }
+    document.querySelectorAll('[data-flight-status-url]').forEach(function (box) {
+        var msg = box.querySelector('.flight-live-msg');
+        var btn = box.querySelector('.flight-live-check');
+        btn.addEventListener('click', function () {
+        btn.disabled = true;
+        msg.textContent = 'Checking…';
+        fetch(box.dataset.flightStatusUrl, {headers: {'Accept': 'application/json'}, credentials: 'same-origin'})
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.found) { msg.textContent = data.message || 'No live data.'; return; }
+                var st = data.status;
+                box.querySelectorAll('.flight-live-badge,.flight-live-detail').forEach(function (n) { n.remove(); });
+                msg.textContent = '';
+                var badge = document.createElement('span');
+                badge.className = 'flight-live-badge is-' + st.status;
+                badge.textContent = st.status_label;
+                var detail = document.createElement('small');
+                detail.className = 'flight-live-detail';
+                detail.textContent = side('Dep', st.departure) + '  →  ' + side('Arr', st.arrival);
+                box.append(badge, detail);
+            })
+            .catch(function () { msg.textContent = 'Live status unavailable right now.'; })
+            .finally(function () { btn.disabled = false; });
+        });
+    });
+})();
+</script>
 {% endblock %}

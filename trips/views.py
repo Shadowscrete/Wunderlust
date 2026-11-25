@@ -19,6 +19,7 @@ from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
 from .recommendations import ideas_for
+from .flight_status import FlightStatusError, get_flight_status, is_trackable
 from .models import trip_readiness
 from accounts.social import avatar_url_for, initials_for
 
@@ -56,7 +57,7 @@ def traveler_dashboard(request):
         day__date__gte=timezone.localdate(),
     ).select_related('day__trip').order_by('day__date', 'start_time')[:6]
     group_memberships = GroupMember.objects.filter(user=request.user).select_related('group_trip__trip', 'group_trip__created_by')
-    travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).distinct()[:8]
+    travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).exclude(category=TravelInfo.Category.FLIGHT).distinct()[:8]
     return render(request, 'dashboard/traveler.html', {
         'trips': upcoming_trips[:5],
         'has_any_trips': trips.exists(),
@@ -180,12 +181,12 @@ def trip_create(request):
                 Checklist(trip=trip, title=name)
                 for name in ('Prescription medication', 'Travel adapter', 'Weather-appropriate clothing', 'Toiletries', 'Reusable water bottle')
             ])
-            if trip.airline:
-                TravelInfo.objects.create(
-                    trip=trip,
-                    category=TravelInfo.Category.FLIGHT,
-                    title='Airline',
-                    details=f'{trip.airline}\nAdd your flight number and booking reference here when available.',
+            if form.flight:
+                from .airlines import AIRLINE_BY_CODE
+                carrier_code, number, flight_date = form.flight
+                Flight.objects.create(
+                    trip=trip, carrier_code=carrier_code, number=number, flight_date=flight_date,
+                    leg=Flight.Leg.OUTBOUND, airline_name=AIRLINE_BY_CODE.get(carrier_code, ''), added_by=request.user,
                 )
             if form.cleaned_data['generate_itinerary']:
                 _build_itinerary(trip, place_names)
@@ -271,6 +272,21 @@ def trip_delete(request, trip_id):
 
 
 @role_required(User.Role.TRAVELER)
+def flight_status(request, trip_id, flight_id):
+    trip = get_object_or_404(_accessible_trips(request.user), pk=trip_id)
+    flight = get_object_or_404(trip.flights, pk=flight_id)
+    if not is_trackable(flight):
+        return JsonResponse({'ok': True, 'tracked': False, 'message': 'Live status is available around the day of the flight.'})
+    try:
+        status = get_flight_status(flight)
+    except FlightStatusError as exc:
+        return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
+    if status is None:
+        return JsonResponse({'ok': True, 'tracked': True, 'found': False, 'message': 'No live data for this flight yet.'})
+    return JsonResponse({'ok': True, 'tracked': True, 'found': True, 'status': status})
+
+
+@role_required(User.Role.TRAVELER)
 def trip_detail(request, trip_id):
     trip = get_object_or_404(_accessible_trips(request.user).select_related('owner'), pk=trip_id)
     checklist = _with_my_ticks(trip.checklist_items.all(), request.user)
@@ -343,7 +359,7 @@ def trip_detail(request, trip_id):
     travelers = _readiness_rows(trip, request.user)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
-    travel_info = list(trip.travel_info.all())
+    travel_info = list(trip.travel_info.exclude(category=TravelInfo.Category.FLIGHT))
     return render(request, 'dashboard/trip_detail.html', {
         'trip': trip,
         'days': days,

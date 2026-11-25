@@ -277,3 +277,8 @@ LOGGING = {
     'handlers': {'console': {'class': 'logging.StreamHandler'}},
     'root': {'handlers': ['console'], 'level': 'WARNING'},
 }
+
+# Live flight status API key (set FLIGHT_API_KEY in .env; never commit it)
+FLIGHT_API_KEY = os.environ.get("FLIGHT_API_KEY", "")
+# Stop calling the API after this many requests per calendar month (free plan: 100).
+FLIGHT_API_MONTHLY_LIMIT = int(os.environ.get("FLIGHT_API_MONTHLY_LIMIT", "90"))

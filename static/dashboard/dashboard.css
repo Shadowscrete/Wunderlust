@@ -2585,3 +2585,21 @@ html{scrollbar-gutter:stable}
 .flight-live-badge{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .flight-live-badge.is-active,.flight-live-badge.is-landed{color:var(--green);border-color:currentColor}
 .flight-live-badge.is-cancelled,.flight-live-badge.is-incident,.flight-live-badge.is-diverted{color:#c0392b;border-color:currentColor}
+
+/* Organizer: remove a traveler from a group trip */
+.traveler-remove{margin-left:auto}
+.traveler-remove .text-button{font-size:12px;color:#c0392b}
+
+/* "Have you bought your plane ticket?" choice cards on the trip form */
+.ticket-choice>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ticket-choice>div>div{display:contents}
+.ticket-choice>div label{display:flex;align-items:center;gap:10px;min-height:41px;padding:10px 12px;background:var(--c-ffffff);border:1px solid var(--line);border-radius:7px;color:var(--ink);font-size:12px;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.ticket-choice>div label:hover{border-color:var(--c-7a987f)}
+.ticket-choice>div label:has(input:checked){border-color:var(--green);background:var(--green-soft)}
+.ticket-choice>div label:has(input:focus-visible){box-shadow:0 0 0 3px var(--c-e9f0e9)}
+.ticket-choice input[type=radio]{appearance:none;-webkit-appearance:none;flex:none;width:16px;height:16px;min-height:16px;margin:0;padding:0;border:1.5px solid var(--c-7a987f);border-radius:50%;background:var(--c-ffffff);box-shadow:none;display:grid;place-content:center;cursor:pointer}
+.ticket-choice input[type=radio]::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green);transform:scale(0);transition:transform .12s}
+.ticket-choice input[type=radio]:checked{border-color:var(--green)}
+.ticket-choice input[type=radio]:checked::before{transform:scale(1)}
+.ticket-choice input[type=radio]:focus{box-shadow:none}
+@media(max-width:700px){.ticket-choice>div{grid-template-columns:1fr}}

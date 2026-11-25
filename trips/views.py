@@ -17,7 +17,7 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
-from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, TravelInfo, Trip, TripPlace
+from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .recommendations import ideas_for
 from .flight_status import FlightStatusError, get_flight_status, is_trackable
 from .models import trip_readiness
@@ -453,8 +453,32 @@ def trip_invite(request, trip_id):
 
 
 @role_required(User.Role.TRAVELER)
+@require_POST
+def trip_remove_member(request, trip_id, user_id):
+    """Only the trip's organizer (owner) can remove a traveler; the organizer can't remove themselves."""
+    trip = _owned_trip(request, trip_id)
+    group = getattr(trip, 'group_trip', None)
+    member = get_object_or_404(GroupMember.objects.select_related('user'), group_trip=group, user_id=user_id) if group else None
+    if member is None or member.user_id == trip.owner_id:
+        messages.error(request, 'That traveler can’t be removed.')
+        return redirect('trip_detail', trip_id=trip.pk)
+    name = member.user.get_full_name() or member.user.get_username()
+    with transaction.atomic():
+        ChecklistCheck.objects.filter(item__trip=trip, user=member.user).delete()
+        member.delete()
+        RemovedMember.objects.get_or_create(group_trip=group, user=member.user)
+        # trip=None: they no longer have access to the trip this notice is about.
+        Notification.objects.create(user=member.user, title='Removed from a trip', message=f'The organizer removed you from the trip to {trip.destination}.')
+    messages.success(request, f'{name} was removed from the trip.')
+    return redirect('trip_detail', trip_id=trip.pk)
+
+
+@role_required(User.Role.TRAVELER)
 def trip_join(request, invite_code):
     group_trip = get_object_or_404(GroupTrip.objects.select_related('trip', 'created_by'), invite_code=invite_code)
+    if group_trip.trip.owner_id != request.user.pk and RemovedMember.objects.filter(group_trip=group_trip, user=request.user).exists():
+        messages.error(request, 'The organizer removed you from this trip, so you can’t rejoin with this link.')
+        return redirect('trip_list')
     if request.method == 'POST':
         membership, created = GroupMember.objects.get_or_create(group_trip=group_trip, user=request.user)
         if created:

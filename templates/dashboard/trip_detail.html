@@ -70,6 +70,9 @@
 </div>
 </div>
 <script>
+document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+    form.addEventListener('submit', function (e) { if (!confirm(form.dataset.confirm)) e.preventDefault(); });
+});
 (function () {
     function fmt(iso) {
         if (!iso) return '';

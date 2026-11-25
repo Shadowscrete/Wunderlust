@@ -235,6 +235,19 @@ class GroupMember(models.Model):
         return f'{self.user} · {self.group_trip.trip.destination}'
 
 
+class RemovedMember(models.Model):
+    """A traveler the organizer removed from a group trip. They can't rejoin with the invite link."""
+    group_trip = models.ForeignKey(GroupTrip, on_delete=models.CASCADE, related_name='removed_members')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+')
+    removed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=('group_trip', 'user'), name='unique_removed_member')]
+
+    def __str__(self):
+        return f'{self.user} removed from {self.group_trip}'
+
+
 class Notification(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='travel_notifications', help_text='Leave empty for a system-wide notice.')
     trip = models.ForeignKey(Trip, null=True, blank=True, on_delete=models.CASCADE, related_name='notifications')

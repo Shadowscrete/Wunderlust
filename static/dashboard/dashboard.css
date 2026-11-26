@@ -2666,10 +2666,94 @@ html{scrollbar-gutter:stable}
 
 .trends-prompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .trends-prompt p { margin: 4px 0 0; color: var(--muted); }
-.trend-list { padding-inline-start: 2rem; }
-.trend-list li { padding: .75rem .25rem; border-bottom: 1px solid var(--line); }
-.trend-list a { color: var(--ink); font-weight: 600; }
-.trend-list small { margin-inline-start: .8rem; color: var(--muted); }
+.trends-prompt .button-secondary { background: var(--green-soft); color: var(--ink); }
+.trends-prompt .button-secondary:hover { border-color: var(--green); }
+.trends-date, .trends-source { color: var(--muted); font-size: 13px; }
+.trends-source { margin-top: 20px; line-height: 1.6; }
+.trends-source a { color: var(--ink); text-underline-offset: .15em; }
+.trend-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 275px), 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 12px 0 0;
+  list-style: none;
+}
+.trend-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.trend-guide { display: block; color: var(--ink); text-decoration: none; }
+.trend-guide:hover h2 { text-decoration: underline; text-underline-offset: .15em; }
+.trend-guide:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.trend-photo { display: block; width: 100%; height: clamp(88px, 15vw, 170px); object-fit: cover; background: var(--green-soft); }
+.trend-guide-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+}
+.trend-rank {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--green-soft);
+  color: var(--ink);
+  font: 600 16px Lora, Georgia, serif;
+}
+.trend-place-1 { background: var(--green-soft); }
+.trend-place-1 .trend-rank { background: #f0dca2; color: #483612; }
+.trend-place-2 .trend-rank { background: #e3e9ee; color: #303e4a; }
+.trend-place-3 .trend-rank { background: #efd8c7; color: #553822; }
+.trend-city h2 { margin: 0 0 3px; font: 600 20px/1.2 Lora, Georgia, serif; overflow-wrap: anywhere; }
+.trend-city > span, .trend-card small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.trend-arrow { color: var(--muted); font-size: 17px; }
+.trend-description { margin: 0 14px 10px; font-size: 13px; line-height: 1.5; }
+.trend-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin-top: auto;
+  padding: 0 14px 6px;
+}
+.trend-plan { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); font-size: 12px; font-weight: 700; }
+.trend-credit { display: block; padding: 0 14px 12px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.trend-place-1 .trend-photo { height: clamp(100px, 18vw, 210px); }
+.trend-list-with-podium { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.trend-list-with-podium .trend-place-2 { margin-top: 24px; }
+.trend-list-with-podium .trend-place-3 { margin-top: 40px; }
+
+@media (max-width: 830px) {
+  .trend-list-with-podium { gap: 8px; }
+  .trend-list-with-podium .trend-place-2 { margin-top: 12px; }
+  .trend-list-with-podium .trend-place-3 { margin-top: 24px; }
+  .trend-list-with-podium li:nth-child(n+4) { grid-column: 1 / -1; }
+  .trend-list-with-podium li:nth-child(-n+3) :is(.trend-guide-body, .trend-card-actions) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-inline: 6px;
+    text-align: center;
+  }
+  .trend-list-with-podium li:nth-child(-n+3) h2 { font-size: 14px; }
+  .trend-list-with-podium li:nth-child(-n+3) .trend-arrow { display: none; }
+  .trend-list-with-podium li:nth-child(-n+3) :is(.trend-description, .trend-credit) {
+    margin-inline: 0;
+    padding-inline: 6px;
+    font-size: 11px;
+    text-align: center;
+  }
+}
 
 .walkthrough { width: min(500px, calc(100vw - 32px)); }
 .walkthrough .modal-body { padding: clamp(18px, 5vw, 28px); gap: 16px; }

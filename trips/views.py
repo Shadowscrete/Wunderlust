@@ -19,7 +19,7 @@ from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
-from .trends import destination_trends
+from .trends import CITIES, destination_trends
 from .recommendations import ideas_for
 from .flight_status import FlightStatusError, get_flight_status, is_trackable
 from .models import trip_readiness
@@ -208,7 +208,9 @@ def travel_information_overview(request):
 
 @role_required(User.Role.TRAVELER)
 def trip_create(request):
-    form = TripForm(request.POST or None)
+    destination = request.GET.get('destination')
+    initial = {'destination': destination, 'country': CITIES[destination][0]} if destination in CITIES else None
+    form = TripForm(request.POST if request.method == 'POST' else None, initial=initial)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             trip = form.save(commit=False)

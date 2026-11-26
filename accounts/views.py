@@ -102,6 +102,7 @@ def account_settings(request):
     appearance_form = AppearanceForm(instance=profile)
     notification_form = NotificationPrefsForm(instance=profile)
     password_form = PasswordChangeForm(user)
+    password_form.fields['old_password'].widget.attrs.pop('autofocus', None)
     delete_form = DeleteAccountForm(user=user)
 
     is_admin = user.role == user.Role.ADMINISTRATOR

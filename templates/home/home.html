@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=4">
+    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=10">
 </head>
 <body class="wunderlust-page">
     <header class="site-header">
@@ -48,10 +48,43 @@
 
         <section class="quick-guide" id="quick-guide" aria-labelledby="guide-title">
             <h2 id="guide-title">How to plan your first trip</h2>
-            <ol>
-                <li><strong>Create your trip</strong><p>Sign in, start a new trip, and enter your destination and travel dates.</p></li>
-                <li><strong>Plan each day</strong><p>Open your itinerary and add activities to the days you want. Leave the time open if you prefer to decide later.</p></li>
-                <li><strong>Get ready to go</strong><p>Use your preparation checklist to track what’s ready. Traveling with friends? Create a trip invite and share the link.</p></li>
+            <ol role="list">
+                <li>
+                    <div class="guide-preview" aria-hidden="true">
+                        <div class="guide-screen">
+                            <b>Plan a new trip</b>
+                            <small>Destination</small><span class="guide-field">Kyoto, Japan</span>
+                            <small>Travel dates</small><span class="guide-field">April 8 – 12</span>
+                            <span class="guide-action">Create trip →</span>
+                        </div>
+                    </div>
+                    <h3>1. Create your trip</h3>
+                    <p>Sign in, start a new trip, and enter your destination and travel dates.</p>
+                </li>
+                <li>
+                    <div class="guide-preview" aria-hidden="true">
+                        <div class="guide-screen">
+                            <b>Itinerary</b><small>April 8 · Kyoto</small>
+                            <div class="guide-row"><span>9:00 AM</span>Visit Kiyomizu-dera</div>
+                            <div class="guide-row"><span>Flexible</span>Walk through Gion</div>
+                            <span class="guide-action">Add activity</span>
+                        </div>
+                    </div>
+                    <h3>2. Plan each day</h3>
+                    <p>Open your itinerary and add activities to a day. Pick a start time or leave it flexible.</p>
+                </li>
+                <li>
+                    <div class="guide-preview" aria-hidden="true">
+                        <div class="guide-screen">
+                            <b>Preparation checklist</b><small>Travel documents</small>
+                            <div class="guide-row"><i class="guide-check">✓</i>Passport</div>
+                            <div class="guide-row"><i class="guide-check">✓</i>Identification</div>
+                            <div class="guide-row"><i class="guide-check"></i>Flight Documents</div>
+                        </div>
+                    </div>
+                    <h3>3. Get ready to go</h3>
+                    <p>Check off your travel documents and essentials as you pack. Traveling with friends? Share a trip invite.</p>
+                </li>
             </ol>
         </section>
 
@@ -60,19 +93,27 @@
                 <div><p class="section-kicker">A little inspiration</p><h2 id="discover-title">Somewhere is<br><em>calling.</em></h2></div>
                 <p class="section-intro">A mountain morning, the long way around, a place you never expected to love. Start with the feeling and see where it takes you.</p>
             </div>
-            <div class="inspiration-grid" id="inspiration">
-                <article class="feature feature-lake">
-                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore culture and mountain journeys">
-                        <img src="{% static 'home/assets/fuji-pagoda.jpg' %}" width="2200" height="1466" alt="A red pagoda overlooking a city with snow-capped Mount Fuji behind it" loading="lazy">
-                        <span class="feature-label">FIND YOUR WONDER</span><span class="feature-caption"><span>Culture &amp; mountain views</span><span aria-hidden="true">&#8599;&#xFE0E;</span></span>
-                    </a>
-                </article>
-                <article class="feature feature-road">
-                    <a href="{% url 'register' %}" class="feature-link" aria-label="Explore coast and island escapes">
-                        <img src="{% static 'home/assets/beach-aerial.jpg' %}" width="1775" height="2200" alt="Boats anchored in turquoise water beside a white sand beach, seen from above" loading="lazy">
-                        <span class="feature-label">FIND YOUR SHORE</span><span class="feature-caption"><span>Coast &amp; island escapes</span><span aria-hidden="true">&#8599;&#xFE0E;</span></span>
-                    </a>
-                </article>
+            <div id="inspiration" role="region" aria-roledescription="carousel" aria-labelledby="discover-title">
+                <div class="inspiration-track" id="inspiration-track">
+                    {% for photo, caption, description, location in inspiration %}
+                    <article class="feature" role="group" aria-roledescription="slide" aria-label="{{ forloop.counter }} of {{ inspiration|length }}">
+                        <a href="{% url 'register' %}" class="feature-link">
+                            <img src="{% static 'home/assets/' %}{{ photo }}" alt="{{ description }}" loading="lazy">
+                            <span class="feature-caption"><span>{{ caption }}</span><span aria-hidden="true">&#8599;&#xFE0E;</span></span>
+                            <span class="feature-location">{{ location }}</span>
+                        </a>
+                    </article>
+                    {% endfor %}
+                </div>
+                <div class="inspiration-controls" hidden>
+                    <button type="button" aria-label="Previous photo" aria-controls="inspiration-track">&#8592;</button>
+                    <div class="inspiration-pages">
+                        {% for photo, caption, description, location in inspiration %}
+                        <button type="button" aria-label="Show {{ caption }}" aria-controls="inspiration-track"></button>
+                        {% endfor %}
+                    </div>
+                    <button type="button" aria-label="Next photo" aria-controls="inspiration-track">&#8594;</button>
+                </div>
             </div>
         </section>
 
@@ -83,6 +124,6 @@
     </main>
 
     <footer class="site-footer"><a class="brand footer-brand" href="{% url 'home' %}">Wunderlust</a><p>For the miles, moments, and memories ahead.</p><div><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Create an account</a></div><small>&copy; {% now "Y" %} Wunderlust</small></footer>
-    <script src="{% static 'home/home.js' %}?v=3" defer></script>
+    <script src="{% static 'home/home.js' %}?v=7" defer></script>
 </body>
 </html>

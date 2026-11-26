@@ -69,6 +69,18 @@ LOCAL_PHOTOS = {
     'Paris': ('trends-paris.webp', 'Pavel Abramiankou', 'yzh7B-9sOhc'),
 }
 
+VERIFIED_PHOTOS = {
+    'Beijing': {
+        'url': 'https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/'
+               'Hall_of_Supreme_Harmony.JPG/960px-Hall_of_Supreme_Harmony.JPG',
+        'alt': 'Hall of Supreme Harmony in Beijing’s Forbidden City',
+        'artist': 'Gisling',
+        'source': 'https://commons.wikimedia.org/wiki/File:Hall_of_Supreme_Harmony.JPG',
+        'license': 'CC BY 3.0',
+        'license_url': 'https://creativecommons.org/licenses/by/3.0/',
+    },
+}
+
 
 def _json_from(url):
     request = Request(url, headers={'User-Agent': 'Wunderlust/1.0 (destination guide readership)'})
@@ -141,7 +153,10 @@ def _city_photos(names):
 
 def _decorate(result):
     cities = result.get('cities', [])
-    photos = _city_photos([city['name'] for city in cities if city['name'] not in LOCAL_PHOTOS])
+    photos = _city_photos([
+        city['name'] for city in cities
+        if city['name'] not in LOCAL_PHOTOS and city['name'] not in VERIFIED_PHOTOS
+    ])
     for city in cities:
         name = city['name']
         city['country'], city['description'] = CITIES[name]
@@ -149,6 +164,8 @@ def _decorate(result):
             filename, artist, identifier = LOCAL_PHOTOS[name]
             city['photo'] = {'url': static(f'home/assets/{filename}'), 'artist': artist,
                              'source': f'https://unsplash.com/photos/{identifier}'}
+        elif name in VERIFIED_PHOTOS:
+            city['photo'] = VERIFIED_PHOTOS[name]
         else:
             city['photo'] = photos.get(name)
     return result

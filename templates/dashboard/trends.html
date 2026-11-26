@@ -14,7 +14,7 @@
     {% for city in cities %}
     <li class="trend-card{% if forloop.counter <= 3 %} trend-place-{{ forloop.counter }}{% endif %}">
         <a class="trend-guide" href="https://en.wikivoyage.org/wiki/{{ city.slug|urlencode }}">
-            {% if city.photo %}<img class="trend-photo" src="{{ city.photo.url }}" alt=""{% if not forloop.first %} loading="lazy"{% endif %} decoding="async">{% endif %}
+            {% if city.photo %}<img class="trend-photo" src="{{ city.photo.url }}" alt="{{ city.photo.alt|default:'' }}"{% if not forloop.first %} loading="lazy"{% endif %} decoding="async">{% endif %}
             <div class="trend-guide-body">
                 <span class="trend-rank"><span class="visually-hidden">Rank </span>{{ forloop.counter }}</span>
                 <div class="trend-city">
@@ -29,7 +29,12 @@
             <small>{{ city.views }} guide views{% if city.movement > 0 %} <span class="trend-movement">· Up {{ city.movement }}</span>{% elif city.movement < 0 %} <span class="trend-movement">· Down {{ city.movement|stringformat:"d"|slice:"1:" }}</span>{% endif %}</small>
             <a class="trend-plan" href="{% url 'trip_create' %}?destination={{ city.name|urlencode:'' }}" aria-label="Plan a trip to {{ city.name }}">Plan trip</a>
         </div>
-        {% if city.photo %}<a class="trend-credit" href="{{ city.photo.source }}">{% if city.photo.artist %}Photo by {{ city.photo.artist }}{% else %}Photo credit{% endif %}{% if city.photo.license %} · {{ city.photo.license }}{% endif %}</a>{% endif %}
+        {% if city.photo %}
+        <span class="trend-credit">
+            <a href="{{ city.photo.source }}">{% if city.photo.artist %}Photo by {{ city.photo.artist }}{% else %}Photo credit{% endif %}{% if city.photo.license and not city.photo.license_url %} · {{ city.photo.license }}{% endif %}</a>
+            {% if city.photo.license_url %} · <a href="{{ city.photo.license_url }}">{{ city.photo.license }}</a> · Cropped for display{% endif %}
+        </span>
+        {% endif %}
     </li>
     {% endfor %}
 </ol>

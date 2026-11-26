@@ -2728,6 +2728,7 @@ html{scrollbar-gutter:stable}
 }
 .trend-plan { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); font-size: 12px; font-weight: 700; }
 .trend-credit { display: block; padding: 0 14px 12px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.trend-credit a { color: inherit; }
 .trend-place-1 .trend-photo { height: clamp(100px, 18vw, 210px); }
 .trend-list-with-podium { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .trend-list-with-podium .trend-place-2 { margin-top: 24px; }

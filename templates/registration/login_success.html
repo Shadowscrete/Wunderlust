@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=4">
 </head>
 <body class="auth-body">
     <main class="auth-layout">
@@ -35,6 +35,6 @@
             <p class="auth-footnote">Good journeys start wherever you are.</p>
         </section>
     </main>
-<script>(function(){var h=new Date().getHours(),g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';document.querySelectorAll('[data-greeting]').forEach(function(el){el.textContent=g;});})();</script>
+<script nonce="{{ csp_nonce }}">(function(){var h=new Date().getHours(),g=h<12?'Good morning':h<18?'Good afternoon':'Good evening';document.querySelectorAll('[data-greeting]').forEach(function(el){el.textContent=g;});})();</script>
 </body>
 </html>

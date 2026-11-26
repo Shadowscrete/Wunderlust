@@ -1,12 +1,11 @@
 from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import datetime, time, timedelta
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Exists, F, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -16,7 +15,7 @@ from accounts.context_processors import get_user_prefs
 from accounts.models import Profile
 
 from .decorators import role_required
-from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
+from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
@@ -146,7 +145,7 @@ def _build_itinerary(trip, place_names):
             trip=trip,
             date=current_date,
             title=f'Day {index + 1}',
-            notes=f'Suggested starting points for {trip.destination}, {trip.country}. Adjust to your pace.',
+            notes='',
         )
         selected_place = next(requested, None)
         if selected_place:
@@ -155,7 +154,7 @@ def _build_itinerary(trip, place_names):
                 title=f'Explore {selected_place}',
                 start_time='09:30',
                 location=selected_place,
-                notes='A place you added to this trip.',
+                notes='',
                 is_recommended=True,
             )
         suggestion = next(remaining_ideas, None)
@@ -167,7 +166,7 @@ def _build_itinerary(trip, place_names):
             title=idea,
             start_time='14:00',
             location=location,
-            notes=f'A flexible suggestion for your time in {trip.destination}. Check local opening times before you go.',
+            notes='Check opening times before you go.',
             is_recommended=True,
         )
 
@@ -394,6 +393,16 @@ def trip_detail(request, trip_id):
                 _notify_group(trip, 'Itinerary updated', f'{activity.title} was added to {trip.destination}.', request.user.pk)
                 messages.success(request, 'Activity added to the itinerary.')
                 return redirect('trip_detail', trip_id=trip.pk)
+        elif action in ('remove_activity', 'keep_activity'):
+            activity = get_object_or_404(Activity.objects.filter(day__trip=trip), pk=_post_id(request, 'activity_id'))
+            if action == 'keep_activity':
+                activity.is_recommended = False  # now part of the traveler's own plan
+                activity.save(update_fields=['is_recommended'])
+                messages.success(request, f'{activity.title} is now part of your plan.')
+            else:
+                messages.success(request, f'{activity.title} was removed from the itinerary.')
+                activity.delete()
+            return redirect('trip_detail', trip_id=trip.pk)
         elif action == 'add_itinerary_day':
             itinerary_day_form = ItineraryDayForm(trip, request.POST)
             if itinerary_day_form.is_valid():

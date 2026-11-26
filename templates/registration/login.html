@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=4">
 </head>
 <body class="auth-body">
     <main class="auth-layout">
@@ -31,7 +31,7 @@
                 <p class="auth-intro">Log in to pick up where your next adventure begins.</p>
                 <form method="post" class="auth-form">
                     {% csrf_token %}
-                    {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+                    {% if lockout_message %}<div class="form-errors" role="alert">{{ lockout_message }}</div>{% endif %}{% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
                     {% for field in form %}
                         <div class="field-row{% if field.errors %} has-error{% endif %}">
                             {{ field.label_tag }}
@@ -40,10 +40,11 @@
                         </div>
                     {% endfor %}
                     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <p class="forgot-link"><a href="{% url 'password_reset' %}">Forgot password?</a></p>
                     <label class="remember-row"><input type="checkbox" name="remember_me" {% if request.POST.remember_me %}checked{% endif %}><span>Remember me</span></label>
                     <button class="submit-button" type="submit">Log in <span aria-hidden="true">&#8599;&#xFE0E;</span></button>
                 </form>
-                <p class="switch-link">New to Wunderlust? <a href="{% url 'register' %}">Create an account</a></p>
+                <p class="switch-link">New to Wunderlust? <a href="{% url 'register' %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}">Create an account</a></p>
             </div>
             <p class="auth-footnote">Good journeys start wherever you are.</p>
         </section>

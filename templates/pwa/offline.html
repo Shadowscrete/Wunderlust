@@ -1,0 +1,6 @@
+{% extends 'errors/base.html' %}
+{% block title %}You're offline{% endblock %}
+{% block code %}NO CONNECTION{% endblock %}
+{% block heading %}You're offline{% endblock %}
+{% block message %}This page hasn't been saved on this device yet. Trips you've opened before, and your upcoming trips, still work without a connection.{% endblock %}
+{% block actions %}<a class="btn" href="/dashboard/trips/">My saved trips</a><a class="btn btn-primary" href="">Try again</a>{% endblock %}

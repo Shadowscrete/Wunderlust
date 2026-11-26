@@ -12,7 +12,7 @@
         {% if editing %}<div class="form-footer"><a class="button button-secondary" href="{% url 'trip_detail' trip.pk %}">Cancel</a><button class="button button-primary" type="submit">Save changes</button></div>{% else %}<div class="form-footer"><p>Four travel documents and five optional essentials will be added to your preparation checklist automatically.</p><button class="button button-primary" type="submit">Create trip <span aria-hidden="true">→︎</span></button></div>{% endif %}
     </form>
 </section>
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
     var radios = document.querySelectorAll('input[name="has_ticket"]');
     if (!radios.length) return;

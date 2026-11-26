@@ -778,3 +778,81 @@ document.querySelectorAll('[data-notice-form]').forEach((form) => {
   form.addEventListener('change', sync);
   sync();
 });
+
+// ---- Installable app + offline access ----
+(() => {
+  if (!('serviceWorker' in navigator)) return;
+  const isTraveler = document.body.dataset.role === 'TRAVELER';
+
+  navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(() => navigator.serviceWorker.ready).then((reg) => {
+    if (!isTraveler || !reg.active) return;
+    // Save upcoming trip pages so they open abroad without mobile data.
+    const urls = [...new Set([...document.querySelectorAll('a[href]')]
+      .map((a) => new URL(a.getAttribute('href'), location.href))
+      .filter((u) => u.origin === location.origin && /^\/dashboard\/trips\/\d+\/$/.test(u.pathname))
+      .map((u) => u.pathname))];
+    urls.push('/dashboard/', '/dashboard/trips/');
+    reg.active.postMessage({ type: 'save-pages', urls });
+  }).catch(() => {});
+
+  // Signing out: drop saved pages right away (the server also sends Clear-Site-Data).
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (form instanceof HTMLFormElement && /\/accounts\/logout\/?$/.test(new URL(form.action, location.href).pathname)) {
+      navigator.serviceWorker.controller?.postMessage({ type: 'clear' });
+    }
+  });
+
+  // Offline banner: tell people they are looking at a saved copy and that changes won't send.
+  const banner = document.createElement('div');
+  banner.className = 'offline-banner';
+  banner.setAttribute('role', 'status');
+  banner.textContent = 'You’re offline. Showing the copy saved on this device; changes will not be sent until you reconnect.';
+  banner.hidden = navigator.onLine;
+  document.body.prepend(banner);
+  const sync = () => {
+    banner.hidden = navigator.onLine;
+    document.body.classList.toggle('is-offline', !navigator.onLine);
+  };
+  window.addEventListener('online', sync);
+  window.addEventListener('offline', sync);
+  sync();
+  document.addEventListener('submit', (event) => {
+    if (!navigator.onLine) {
+      event.preventDefault();
+      showErrorToast?.(new Error('offline'), 'You’re offline. Reconnect to save changes.');
+    }
+  }, true);
+
+  // "Install app" menu item, shown only when the browser offers installation.
+  let deferredPrompt = null;
+  const installButton = document.querySelector('[data-install-app]');
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredPrompt = event;
+    if (installButton) installButton.hidden = false;
+  });
+  installButton?.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installButton.hidden = true;
+  });
+  window.addEventListener('appinstalled', () => { if (installButton) installButton.hidden = true; });
+})();
+
+// ---- Time zone: tell the server once (and whenever it changes, e.g. after landing abroad) ----
+(() => {
+  const body = document.body;
+  let zone = '';
+  try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (err) { return; }
+  if (!zone || zone === body.dataset.timezone || !body.dataset.timezoneEndpoint || !navigator.onLine) return;
+  const csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
+  if (!csrf) return;
+  const data = new FormData();
+  data.append('timezone', zone);
+  fetch(body.dataset.timezoneEndpoint, { method: 'POST', body: data, headers: { 'X-CSRFToken': csrf.value }, credentials: 'same-origin' })
+    .then((r) => { if (r.ok) body.dataset.timezone = zone; })
+    .catch(() => {});
+})();

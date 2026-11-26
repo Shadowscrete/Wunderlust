@@ -4,31 +4,34 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Wunderlust">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#f5f3ed">
-    <meta name="description" content="Find your next somewhere with Wunderlust. Thoughtful travel starts here.">
-    <title>Wunderlust — Find your somewhere</title>
+    <meta name="description" content="Wunderlust keeps your group trip out of the group chat: one shared itinerary, document checklists, live flight status and a clear view of who is ready to go. Works offline.">
+    <title>Wunderlust — Group trips, finally organized</title>
     <link rel="icon" href="{% static 'home/assets/favicon-v3.ico' %}" sizes="any">
     <link rel="icon" href="{% static 'home/assets/favicon-v3.png' %}" type="image/png" sizes="32x32">
     <link rel="apple-touch-icon" href="{% static 'home/assets/apple-touch-icon-v3.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=10">
+    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=11">
 </head>
 <body class="wunderlust-page">
     <header class="site-header">
         <a class="brand" href="{% url 'home' %}" aria-label="Wunderlust home">Wunderlust</a>
         <nav class="main-nav" aria-label="Main navigation">
-            <a href="#quick-guide">Quick guide</a>
-            <a href="#discover">Discover</a>
-            <a href="#inspiration">Inspiration</a>
-            <a href="#about">Our approach</a>
+            <a href="#features">Features</a>
+            <a href="#quick-guide">How it works</a>
+            <a href="#install">Get the app</a>
+            <a href="#discover">Inspiration</a>
         </nav>
         <div class="account-nav"><a class="login-link" href="{% url 'login' %}">Log in</a><a class="signup-link" href="{% url 'register' %}">Join Wunderlust <span aria-hidden="true">&#8599;&#xFE0E;</span></a></div>
         <button class="mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-navigation"><span></span><span></span></button>
         <nav class="mobile-navigation" id="mobile-navigation" aria-label="Mobile navigation">
-            <a href="#quick-guide">Quick guide</a>
-            <a href="#discover">Discover</a><a href="#inspiration">Inspiration</a><a href="#about">Our approach</a><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Join Wunderlust</a>
+            <a href="#features">Features</a><a href="#quick-guide">How it works</a><a href="#install">Get the app</a><a href="#discover">Inspiration</a><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Join Wunderlust</a>
         </nav>
     </header>
 
@@ -37,17 +40,46 @@
             <img class="hero-image" src="{% static 'home/assets/boat-lake.jpg' %}" width="2200" height="1467" alt="A wooden boat gliding over an alpine lake toward the mountains" fetchpriority="high">
             <div class="hero-shade" aria-hidden="true"></div>
             <div class="hero-content">
-                <p class="hero-kicker fade-in fade-one"><span></span> TRAVEL, YOUR WAY</p>
-                <h1 id="hero-title" class="fade-in fade-two">Find your<br><em>somewhere.</em></h1>
-                <p class="hero-copy fade-in fade-three">The world is wide open. Find a place that feels like yours, then make the journey your own.</p>
-                <a class="hero-button fade-in fade-four" href="{% url 'register' %}">Start exploring <span aria-hidden="true">&#8599;&#xFE0E;</span></a>
+                <p class="hero-kicker fade-in fade-one"><span></span> FOR THE FRIEND WHO PLANS THE TRIP</p>
+                <h1 id="hero-title" class="fade-in fade-two">Get the group<br><em>out the door.</em></h1>
+                <p class="hero-copy fade-in fade-three">Group trips fall apart in the group chat. Wunderlust gives everyone one shared itinerary, a document checklist and live flight status, and shows you who is actually ready to go. Free, and it works offline.</p>
+                <a class="hero-button fade-in fade-four" href="{% url 'register' %}">Plan a trip, free <span aria-hidden="true">&#8599;&#xFE0E;</span></a>
             </div>
             <div class="hero-caption"><span class="caption-rule"></span> LAKE BRAIES, DOLOMITES <span class="caption-coordinates">46°41′N&nbsp; 12°05′E</span></div>
-            <a class="scroll-cue" href="#discover" aria-label="Scroll to discover travel inspiration"><span></span></a>
+            <a class="scroll-cue" href="#features" aria-label="Scroll to see what Wunderlust does"><span></span></a>
+        </section>
+
+        <section class="features-section" id="features" aria-labelledby="features-title">
+            <p class="section-kicker">What makes it different</p>
+            <h2 id="features-title">Everything the group chat can't keep track of</h2>
+            <div class="feature-grid">
+                <article class="feature-card">
+                    <div class="guide-screen" aria-hidden="true"><b>Who's ready?</b><small>Kyoto · 3 travelers</small>
+                        <div class="ready-row"><span>Ana</span><i class="ready-bar"><i class="w-100"></i></i><em>Ready</em></div>
+                        <div class="ready-row"><span>Ben</span><i class="ready-bar"><i class="w-75"></i></i><em>3/4</em></div>
+                        <div class="ready-row"><span>Cara</span><i class="ready-bar"><i class="w-25"></i></i><em>1/4</em></div></div>
+                    <h3>See who's ready at a glance</h3><p>Each traveler ticks off their own documents. Their progress bar shows you who still needs a nudge, without asking in the chat.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="guide-screen" aria-hidden="true"><b>Travel documents</b><small>Checked by you</small>
+                        <div class="guide-row"><i class="guide-check">✓</i>Passport</div><div class="guide-row"><i class="guide-check">✓</i>Visa</div><div class="guide-row"><i class="guide-check"></i>Flight documents</div></div>
+                    <h3>Documents first, packing second</h3><p>Passports, visas and IDs sit at the top of every trip, separate from the packing list, so the things that can stop you at the airport never get missed.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="guide-screen" aria-hidden="true"><b>PR 102 · Manila → Tokyo</b><small>Today</small>
+                        <div class="guide-row"><span>Status</span>On time</div><div class="guide-row"><span>Gate</span>12</div></div>
+                    <h3>Live flight status</h3><p>Add your flight number once. Everyone in the trip can check departure status and gate without opening another app.</p>
+                </article>
+                <article class="feature-card">
+                    <div class="guide-screen" aria-hidden="true"><b>No signal?</b><small>Saved on this device</small>
+                        <div class="guide-row"><span>Day 2</span>Fushimi Inari, 8:00 AM</div><div class="guide-row"><span>Hotel</span>Address &amp; check-in</div></div>
+                    <h3>Works without data</h3><p>Install Wunderlust on your phone and your upcoming trips open even offline: on the plane, abroad, or underground.</p>
+                </article>
+            </div>
         </section>
 
         <section class="quick-guide" id="quick-guide" aria-labelledby="guide-title">
-            <h2 id="guide-title">How to plan your first trip</h2>
+            <h2 id="guide-title">From idea to boarding in three steps</h2>
             <ol role="list">
                 <li>
                     <div class="guide-preview" aria-hidden="true">
@@ -83,9 +115,24 @@
                         </div>
                     </div>
                     <h3>3. Get ready to go</h3>
-                    <p>Check off your travel documents and essentials as you pack. Traveling with friends? Share a trip invite.</p>
+                    <p>Share one invite link with your group. Everyone ticks off their own passport, visa and packing, and you see who is ready.</p>
                 </li>
             </ol>
+        </section>
+
+        <section class="install-section" id="install" aria-labelledby="install-title">
+            <div>
+                <p class="section-kicker">Get the app</p>
+                <h2 id="install-title">Put your trip <em>in your pocket.</em></h2>
+                <p>Wunderlust installs straight from your browser: no app store and almost no storage. It opens full-screen from your home screen and keeps your upcoming trips available offline.</p>
+                <button class="hero-button install-button" type="button" data-install-app hidden>Install Wunderlust <span aria-hidden="true">&#8595;&#xFE0E;</span></button>
+                <ul class="install-steps" role="list">
+                    <li><strong>Android &amp; Chrome:</strong> tap <em>Install Wunderlust</em> above, or open the browser menu and choose <em>Install app</em>.</li>
+                    <li><strong>iPhone &amp; iPad:</strong> open this page in Safari, tap the Share button, then <em>Add to Home Screen</em>.</li>
+                    <li><strong>Desktop:</strong> click the install icon at the right of the address bar.</li>
+                </ul>
+            </div>
+            <img src="{% static 'pwa/icon-512.png' %}" width="220" height="220" alt="The Wunderlust app icon" loading="lazy" class="install-icon">
         </section>
 
         <section class="discover-section" id="discover" aria-labelledby="discover-title">
@@ -118,12 +165,12 @@
         </section>
 
         <section class="about-section" id="about" aria-labelledby="about-title">
-            <div class="about-copy"><p class="section-kicker">A different kind of travel</p><h2 id="about-title">Make room for<br>the <em>unexpected.</em></h2><p>Wunderlust is for the curious, the slow wanderers, and everyone who knows the best part of a trip is often the part you didn't plan. Follow what moves you. Take the turn that looks interesting. Come back with a story all your own.</p><a class="about-link" href="{% url 'register' %}">Your journey starts here <span aria-hidden="true">&#8594;&#xFE0E;</span></a></div>
+            <div class="about-copy"><p class="section-kicker">Why we built it</p><h2 id="about-title">Less chasing,<br>more <em>travelling.</em></h2><p>Every group has one organizer, asking the same questions on repeat: Did you book your flight? Is your passport still valid? What time are we meeting? Wunderlust answers them in one place, so the organizer gets to enjoy the trip too. Plan the essentials together, then leave room for the parts you didn't plan.</p><a class="about-link" href="{% url 'register' %}">Start your group trip <span aria-hidden="true">&#8594;&#xFE0E;</span></a></div>
             <img class="about-image" src="{% static 'home/assets/roadsigns-travel.jpg' %}" width="1500" height="2250" alt="A cluster of colorful destination signs" loading="lazy">
         </section>
     </main>
 
-    <footer class="site-footer"><a class="brand footer-brand" href="{% url 'home' %}">Wunderlust</a><p>For the miles, moments, and memories ahead.</p><div><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Create an account</a></div><small>&copy; {% now "Y" %} Wunderlust</small></footer>
-    <script src="{% static 'home/home.js' %}?v=7" defer></script>
+    <footer class="site-footer"><a class="brand footer-brand" href="{% url 'home' %}">Wunderlust</a><p>Group trips, finally organized. For the miles, moments, and memories ahead.</p><div><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Create an account</a></div><small>&copy; {% now "Y" %} Wunderlust</small></footer>
+    <script src="{% static 'home/home.js' %}?v=8" defer></script>
 </body>
 </html>

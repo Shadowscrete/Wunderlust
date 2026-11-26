@@ -41,21 +41,13 @@ if not SECRET_KEY:
         MISSING_PRODUCTION_SETTINGS.append('DJANGO_SECRET_KEY')
     SECRET_KEY = 'django-insecure-local-development-only-key-do-not-use-in-production'
 
-ALLOWED_HOSTS = [
-    "wunderlust-six.vercel.app",
-    ".vercel.app",  # Vercel preview deployments (each push gets its own *.vercel.app address)
-    "localhost",
-    "127.0.0.1",
-]
+# Only this project's own addresses. Vercel exposes the current deployment's hostnames as system
+# environment variables, so previews work without trusting every *.vercel.app site on the internet.
+_vercel_hosts = [os.getenv(name, '').strip() for name in ('VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL')]
+_extra_hosts = [h.strip() for h in os.getenv('EXTRA_ALLOWED_HOSTS', '').split(',')]
+ALLOWED_HOSTS = sorted({'wunderlust-six.vercel.app', 'localhost', '127.0.0.1', *filter(None, _vercel_hosts + _extra_hosts)})
+CSRF_TRUSTED_ORIGINS = [f'https://{host}' for host in ALLOWED_HOSTS if host not in ('localhost', '127.0.0.1')]
 
-# Forms (login, sign-up, every POST) are only accepted from these HTTPS origins.
-CSRF_TRUSTED_ORIGINS = [
-    "https://wunderlust-six.vercel.app",
-    "https://*.vercel.app",
-]
-
-# Vercel terminates HTTPS and forwards requests to Django over HTTP. This header tells Django the
-# original request was HTTPS, so request.is_secure() is correct and CSRF origin checks pass.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
@@ -83,8 +75,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.UserTimezoneMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     # JSON errors for background requests, 503 page when the database is unreachable.
     'config.errors.ErrorHandlingMiddleware',
 ]
@@ -106,6 +100,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'accounts.context_processors.user_prefs',
                 'config.context_processors.asset_version',
+                'django.template.context_processors.csp',
             ],
         },
     },
@@ -198,11 +193,26 @@ USE_TZ = True
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}
+# Email (password reset). Set EMAIL_HOST etc. in the environment to send real mail through any SMTP
+# provider (Brevo, SendGrid, Resend, Gmail app password). Without it, emails print to the console.
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Wunderlust <no-reply@wunderlust.app>')
+if os.getenv('EMAIL_HOST'):
+    MAILERS = {
+        'default': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {
+                'host': os.getenv('EMAIL_HOST'),
+                'port': int(os.getenv('EMAIL_PORT', '587')),
+                'username': os.getenv('EMAIL_HOST_USER', ''),
+                'password': os.getenv('EMAIL_HOST_PASSWORD', ''),
+                'use_tls': os.getenv('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes'),
+                'timeout': 10,
+            },
+        },
+    }
+else:
+    MAILERS = {'default': {'BACKEND': 'django.core.mail.backends.console.EmailBackend'}}
+PASSWORD_RESET_TIMEOUT = 60 * 60  # reset links work for one hour
 
 
 LOGIN_REDIRECT_URL = 'home'
@@ -270,6 +280,24 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = 'same-origin'
 
+# Content-Security-Policy: scripts only from this site (inline ones need the per-request nonce),
+# fonts from Google Fonts, profile pictures from Supabase Storage. Blocks injected scripts and framing.
+from django.utils.csp import CSP  # noqa: E402
+SECURE_CSP = {
+    'default-src': [CSP.SELF],
+    'script-src': [CSP.SELF, CSP.NONCE],
+    'style-src': [CSP.SELF, CSP.UNSAFE_INLINE, 'https://fonts.googleapis.com'],
+    'font-src': [CSP.SELF, 'https://fonts.gstatic.com'],
+    'img-src': [CSP.SELF, 'data:', 'blob:', 'https://*.supabase.co'],
+    'connect-src': [CSP.SELF],
+    'manifest-src': [CSP.SELF],
+    'worker-src': [CSP.SELF],
+    'frame-ancestors': [CSP.NONE],
+    'form-action': [CSP.SELF],
+    'base-uri': [CSP.SELF],
+    'object-src': [CSP.NONE],
+}
+
 # Send warnings and errors to the console, which Vercel shows under Logs.
 LOGGING = {
     'version': 1,
@@ -282,3 +310,19 @@ LOGGING = {
 FLIGHT_API_KEY = os.environ.get("FLIGHT_API_KEY", "")
 # Stop calling the API after this many requests per calendar month (free plan: 100).
 FLIGHT_API_MONTHLY_LIMIT = int(os.environ.get("FLIGHT_API_MONTHLY_LIMIT", "90"))
+# The key is sent in the URL, so HTTPS keeps it private. Aviationstack's free plan is HTTP-only:
+# set FLIGHT_API_BASE_URL=http://api.aviationstack.com/v1 only if you accept that risk.
+FLIGHT_API_BASE_URL = os.environ.get("FLIGHT_API_BASE_URL", "https://api.aviationstack.com/v1")
+
+# Login protection: lock out a username/address pair after this many failed attempts.
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60
+
+# Tests always run on a throwaway in-memory database, never the shared Supabase one.
+import sys  # noqa: E402
+if len(sys.argv) > 1 and sys.argv[1] == 'test':
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': ':memory:'}}
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+    STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}

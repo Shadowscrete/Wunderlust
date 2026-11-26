@@ -27,7 +27,8 @@
         <p class="code">{% block code %}ERROR{% endblock %}</p>
         <h1>{% block heading %}Something went wrong{% endblock %}</h1>
         <p>{% block message %}Please try again in a moment.{% endblock %}</p>
-        <div class="actions">{% block actions %}<button class="btn" type="button" onclick="history.length > 1 ? history.back() : location.assign('/')">Go back</button><a class="btn btn-primary" href="/dashboard/">Go to dashboard</a>{% endblock %}</div>
+        <div class="actions">{% block actions %}<button class="btn" type="button" data-go-back>Go back</button><a class="btn btn-primary" href="/dashboard/">Go to dashboard</a>{% endblock %}</div>
     </main>
+    <script nonce="{{ csp_nonce }}">document.addEventListener('click',function(e){var t=e.target.closest('[data-go-back],[data-reload]');if(!t)return;if(t.hasAttribute('data-reload')){location.reload()}else if(history.length>1){history.back()}else{location.assign('/')}});</script>
 </body>
 </html>

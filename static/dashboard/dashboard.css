@@ -2823,3 +2823,11 @@ html{scrollbar-gutter:stable}
   65% { opacity: 1; transform: translateY(-2px); }
   100% { opacity: 1; transform: none; }
 }
+
+/* ---- Offline mode ---- */
+.offline-banner{position:sticky;top:0;z-index:60;padding:10px 16px;background:var(--sand);color:var(--ink);border-bottom:1px solid var(--line);font-size:13px;text-align:center}
+.offline-banner[hidden]{display:none}
+.is-offline form button[type=submit]{opacity:.55}
+.activity-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+.activity-actions form{margin:0}
+.activity-remove{color:var(--muted)}

@@ -1,13 +1,18 @@
 import logging
+import zoneinfo
 
-from django.shortcuts import render, redirect
+from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import LoginView
-from django.core.cache import cache
+from django.contrib.auth.views import LoginView, LogoutView, PasswordResetView
 from django.views.decorators.http import require_POST
 
 from .context_processors import clear_user_prefs
@@ -15,7 +20,11 @@ from .sessions import active_devices, end_session, sign_out_other_sessions
 from .models import Follow, Report, UserSession
 from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, RegisterForm, ReportForm
 from .social import avatar_url_for, connection_sets, discoverable_users, initials_for, notify_follow, relationship
-from .models import Profile
+from .models import Profile, User
+from .security import clear_login_failures, login_locked, rate_limited, record_login_failure
+from trips.admin_views import notify_admins_of_report
+from trips.decorators import role_required
+from trips.models import Trip
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +34,48 @@ class WunderlustLoginView(LoginView):
     next_page = 'login_success'
     # Already signed in (session still valid) -> skip the form, go to dashboard.
     redirect_authenticated_user = True
+    LOCKED_MESSAGE = 'Too many sign-in attempts. Please wait 15 minutes, or reset your password.'
+
+    def post(self, request, *args, **kwargs):
+        username = request.POST.get('username', '')[:150]
+        if login_locked(request, username):
+            # Don't even check the password while locked, so guessing gains nothing.
+            form = self.form_class(request, initial={'username': username})
+            return self.render_to_response(self.get_context_data(form=form, lockout_message=self.LOCKED_MESSAGE), status=429)
+        return super().post(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        record_login_failure(self.request, self.request.POST.get('username', '')[:150])
+        return super().form_invalid(form)
 
     def form_valid(self, form):
+        clear_login_failures(self.request, form.get_user().get_username())
         response = super().form_valid(form)
         if self.request.POST.get('remember_me') == 'on':
             self.request.session.set_expiry(60 * 60 * 24 * 14)
         else:
             self.request.session.set_expiry(0)
         return response
+
+class WunderlustPasswordResetView(PasswordResetView):
+    email_template_name = 'registration/password_reset_email.txt'
+    subject_template_name = 'registration/password_reset_subject.txt'
+
+    def form_valid(self, form):
+        # Stop the form being used to flood someone's inbox. The response looks the same either way,
+        # so it can't be used to discover which emails have accounts.
+        if rate_limited(self.request, 'password-reset', limit=5, window=60 * 60):
+            return redirect(self.get_success_url())
+        return super().form_valid(form)
+
+
+class WunderlustLogoutView(LogoutView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        # Wipe trip pages saved for offline use, so the next person on this device can't open them.
+        response['Clear-Site-Data'] = '"cache", "storage"'
+        return response
+
 
 def register(request):
     if request.user.is_authenticated:
@@ -45,11 +88,15 @@ def register(request):
             user.role = user.Role.TRAVELER
             user.save(update_fields=['role'])
             login(request, user)
+            # Came from a trip invite link? Go straight back to it after signing up.
+            next_url = request.POST.get('next', '')
+            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                return redirect(next_url)
             return redirect('traveler_dashboard')
     else:
         form = RegisterForm()
 
-    return render(request, 'registration/register.html', {'form': form})
+    return render(request, 'registration/register.html', {'form': form, 'next': request.POST.get('next') or request.GET.get('next', '')})
 
 
 @login_required
@@ -63,9 +110,6 @@ def login_success(request):
 def profile(request):
     if request.user.role == request.user.Role.ADMINISTRATOR:
         return redirect('admin_dashboard')  # administrators don't have a traveler profile
-    from django.db.models import Count, Q
-    from django.utils import timezone
-    from trips.models import Trip
 
     user = request.user
     profile_details = Profile.objects.filter(user=user).first() or Profile(user=user)
@@ -163,6 +207,18 @@ def account_settings(request):
     })
 
 @login_required
+@require_POST
+def update_timezone(request):
+    """Saves the time zone the browser reports (sent automatically, at most when it changes)."""
+    name = request.POST.get('timezone', '')[:64]
+    if name not in zoneinfo.available_timezones():
+        return JsonResponse({'error': 'Unknown time zone.'}, status=400)
+    Profile.objects.update_or_create(user=request.user, defaults={'timezone': name})
+    clear_user_prefs(request.user.pk)
+    return JsonResponse({'timezone': name})
+
+
+@login_required
 def support(request):
     return render(request, 'accounts/support.html')
 
@@ -209,13 +265,7 @@ def update_avatar(request):
 
 
 # ======================= Social: search, profiles, follow, report, friends =======================
-from django.db import IntegrityError, transaction  # noqa: E402
-from django.db.models import Q  # noqa: E402
-from django.http import JsonResponse  # noqa: E402
-from django.shortcuts import get_object_or_404  # noqa: E402
 
-from trips.decorators import role_required  # noqa: E402
-from .models import User  # noqa: E402
 
 TRAVELER = User.Role.TRAVELER
 
@@ -224,6 +274,8 @@ TRAVELER = User.Role.TRAVELER
 def user_search(request):
     """Live search for the header: up to 8 travelers matching every word typed."""
     query = ' '.join(request.GET.get('q', '').split())[:60]
+    if rate_limited(request, 'user-search', limit=60, window=60):
+        return JsonResponse({'results': [], 'error': 'Too many searches. Wait a moment and try again.'}, status=429)
     if len(query) < 2:
         return JsonResponse({'results': []})
     people = discoverable_users().exclude(pk=request.user.pk)
@@ -252,9 +304,6 @@ def public_profile(request, username):
     viewer_is_admin = request.user.role == User.Role.ADMINISTRATOR
     if person.pk == request.user.pk:
         return redirect('profile')
-    from django.db.models import Count, Q
-    from django.utils import timezone
-    from trips.models import Trip
     today = timezone.localdate()
     trip_ids = Trip.objects.filter(Q(owner=person) | Q(group_trip__members__user=person)).values('pk')
     person_trips = Trip.objects.filter(pk__in=trip_ids)
@@ -314,6 +363,9 @@ def report_user(request, username):
     if person.pk == request.user.pk:
         return redirect('profile')
     form = ReportForm(request.POST)
+    if rate_limited(request, 'report', limit=10, window=60 * 60 * 24):
+        messages.error(request, 'You’ve sent a lot of reports today. Our team is reviewing them; try again tomorrow.')
+        return redirect('public_profile', username=person.get_username())
     if not form.is_valid():
         messages.error(request, 'Choose a reason for the report.')
     elif Report.objects.filter(reporter=request.user, reported_user=person, status=Report.Status.OPEN).exists():
@@ -322,7 +374,6 @@ def report_user(request, username):
         report = form.save(commit=False)
         report.reporter, report.reported_user = request.user, person
         report.save()
-        from trips.admin_views import notify_admins_of_report
         notify_admins_of_report(report)
         messages.success(request, 'Thanks for letting us know. Our team will review this report.')
     return redirect('public_profile', username=person.get_username())

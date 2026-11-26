@@ -89,3 +89,23 @@
     controls.hidden = false;
     show(0);
 })();
+
+// Installable app: register the service worker and show the install button when the browser offers it.
+(function () {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+    var deferred = null;
+    var buttons = document.querySelectorAll('[data-install-app]');
+    window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferred = event;
+        buttons.forEach(function (b) { b.hidden = false; });
+    });
+    buttons.forEach(function (b) {
+        b.addEventListener('click', function () {
+            if (!deferred) return;
+            deferred.prompt();
+            deferred.userChoice.finally(function () { deferred = null; buttons.forEach(function (x) { x.hidden = true; }); });
+        });
+    });
+})();

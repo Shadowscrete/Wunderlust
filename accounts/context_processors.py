@@ -2,7 +2,7 @@ from django.core.cache import cache
 
 from .models import Profile
 
-DEFAULT_PREFS = {'avatar_url': '', 'theme': Profile.Theme.SYSTEM, 'notify_system': True}
+DEFAULT_PREFS = {'avatar_url': '', 'theme': Profile.Theme.SYSTEM, 'notify_system': True, 'timezone': ''}
 
 
 def _prefs_key(user_id):
@@ -14,14 +14,15 @@ def get_user_prefs(user):
     Cached so every page doesn't pay a round-trip to the remote database."""
     key = _prefs_key(user.pk)
     prefs = cache.get(key)
-    if prefs is None:
-        profile = Profile.objects.filter(user=user).only('avatar', 'theme', 'notify_system').first()
+    if prefs is None or 'timezone' not in prefs:
+        profile = Profile.objects.filter(user=user).only('avatar', 'theme', 'notify_system', 'timezone').first()
         prefs = dict(DEFAULT_PREFS)
         if profile:
             prefs = {
                 'avatar_url': profile.avatar.url if profile.avatar else '',
                 'theme': profile.theme,
                 'notify_system': profile.notify_system,
+                'timezone': profile.timezone,
             }
         cache.set(key, prefs, 60 * 60)
     return prefs
@@ -36,7 +37,7 @@ def user_prefs(request):
     if not user or not user.is_authenticated:
         return {}
     prefs = get_user_prefs(user)
-    context = {'avatar_url': prefs['avatar_url'], 'user_theme': prefs['theme']}
+    context = {'avatar_url': prefs['avatar_url'], 'user_theme': prefs['theme'], 'user_timezone': prefs['timezone']}
     if user.role == user.Role.ADMINISTRATOR:
         context['admin_open_reports'] = open_report_count()
     return context

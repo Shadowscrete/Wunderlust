@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=4">
 </head>
 <body class="auth-body">
     <main class="auth-layout auth-layout-register">
@@ -30,7 +30,7 @@
                 <h1 id="auth-title">Create your account</h1>
                 <p class="auth-intro">Join Wunderlust and start planning your next somewhere.</p>
                 <form method="post" class="auth-form">
-                    {% csrf_token %}
+                    {% csrf_token %}{% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
                     {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
                     {% for field in form %}
                         <div class="field-row{% if field.errors %} has-error{% endif %}">

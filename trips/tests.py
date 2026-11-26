@@ -196,3 +196,108 @@ class PreparationAndItineraryTests(TestCase):
         RemovedMember.objects.create(group_trip=group, user=guest)
         self.assertRedirects(self.client.post(invite), listing)
         self.assertFalse(group.members.filter(user=guest).exists())
+
+
+class TravelerFlowTests(TestCase):
+    """The traveler side: creating trips, access control, groups, checklist and itinerary edits."""
+
+    def setUp(self):
+        cache.clear()
+        self.owner = User.objects.create_user('olivia', 'olivia@example.com', 'Fjord!52Maple')
+        self.friend = User.objects.create_user('felix', 'felix@example.com', 'Fjord!52Maple')
+        self.stranger = User.objects.create_user('sam', 'sam@example.com', 'Fjord!52Maple')
+        self.client.force_login(self.owner)
+        today = timezone.localdate()
+        self.client.post(reverse('trip_create'), {
+            'destination': 'Kyoto', 'country': 'Japan',
+            'start_date': (today + timedelta(days=20)).isoformat(), 'end_date': (today + timedelta(days=22)).isoformat(),
+            'has_ticket': 'no', 'places': '', 'generate_itinerary': 'on',
+        })
+        self.trip = Trip.objects.get(destination='Kyoto')
+
+    def test_trip_creation_sets_up_checklist_and_itinerary(self):
+        self.assertEqual(self.trip.owner, self.owner)
+        self.assertEqual(self.trip.itinerary_days.count(), 3)
+        self.assertTrue(self.trip.checklist_items.filter(is_document=True, title='Passport').exists())
+
+    def test_strangers_cannot_see_or_change_a_trip(self):
+        self.client.force_login(self.stranger)
+        self.assertEqual(self.client.get(reverse('trip_detail', args=[self.trip.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse('trip_delete', args=[self.trip.pk])).status_code, 404)
+        item = self.trip.checklist_items.first()
+        self.assertEqual(self.client.post(reverse('checklist_toggle', args=[item.pk])).status_code, 404)
+        self.assertTrue(Trip.objects.filter(pk=self.trip.pk).exists())
+
+    def test_invite_join_and_member_permissions(self):
+        self.client.post(reverse('trip_invite', args=[self.trip.pk]))
+        code = self.trip.__class__.objects.get(pk=self.trip.pk).group_trip.invite_code
+        self.client.force_login(self.friend)
+        self.client.post(reverse('trip_join', args=[code]))
+        self.assertEqual(self.client.get(reverse('trip_detail', args=[self.trip.pk])).status_code, 200)
+        # Members can view, but only the owner can delete.
+        self.assertEqual(self.client.post(reverse('trip_delete', args=[self.trip.pk])).status_code, 404)
+
+    def test_suggested_activity_can_be_kept_or_removed(self):
+        from .models import Activity
+        suggested = list(Activity.objects.filter(day__trip=self.trip, is_recommended=True)[:2])
+        url = reverse('trip_detail', args=[self.trip.pk])
+        self.client.post(url, {'action': 'keep_activity', 'activity_id': suggested[0].pk})
+        self.client.post(url, {'action': 'remove_activity', 'activity_id': suggested[1].pk})
+        suggested[0].refresh_from_db()
+        self.assertFalse(suggested[0].is_recommended)
+        self.assertFalse(Activity.objects.filter(pk=suggested[1].pk).exists())
+
+    def test_cannot_remove_activity_from_someone_elses_trip(self):
+        from .models import Activity
+        activity = Activity.objects.filter(day__trip=self.trip).first()
+        self.client.force_login(self.stranger)
+        self.client.post(reverse('trip_detail', args=[self.trip.pk]), {'action': 'remove_activity', 'activity_id': activity.pk})
+        self.assertTrue(Activity.objects.filter(pk=activity.pk).exists())
+
+
+class PlatformTests(TestCase):
+    def test_manifest_and_service_worker(self):
+        manifest = self.client.get('/manifest.webmanifest')
+        self.assertEqual(manifest['Content-Type'], 'application/manifest+json')
+        self.assertEqual(manifest.json()['display'], 'standalone')
+        worker = self.client.get('/sw.js')
+        self.assertEqual(worker.status_code, 200)
+        self.assertIn('javascript', worker['Content-Type'])
+        self.assertIn('/offline/', worker.content.decode())
+        self.assertEqual(self.client.get('/offline/').status_code, 200)
+
+    def test_content_security_policy_and_nonce(self):
+        user = User.objects.create_user('nonce', password='Fjord!52Maple')
+        self.client.force_login(user)
+        response = self.client.get(reverse('traveler_dashboard'))
+        policy = response['Content-Security-Policy']
+        self.assertIn("frame-ancestors 'none'", policy)
+        nonce = policy.split("'nonce-")[1].split("'")[0]
+        self.assertIn(f'nonce="{nonce}"', response.content.decode())
+
+    def test_user_timezone_decides_today(self):
+        import zoneinfo
+        user = User.objects.create_user('tz', password='Fjord!52Maple')
+        self.client.force_login(user)
+        self.assertEqual(self.client.post(reverse('update_timezone'), {'timezone': 'Not/AZone'}).status_code, 400)
+        self.client.post(reverse('update_timezone'), {'timezone': 'Asia/Manila'})
+        from accounts.models import Profile
+        self.assertEqual(Profile.objects.get(user=user).timezone, 'Asia/Manila')
+        from accounts.middleware import UserTimezoneMiddleware
+        seen = {}
+        def capture(request):
+            seen['tz'] = timezone.get_current_timezone()
+            return None
+        request = self.client.get('/').wsgi_request
+        request.user = user
+        UserTimezoneMiddleware(capture)(request)
+        self.assertEqual(seen['tz'], zoneinfo.ZoneInfo('Asia/Manila'))
+
+    def test_public_pages_render(self):
+        for url in ('/', reverse('login'), reverse('register'), reverse('password_reset'), reverse('password_reset_done')):
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+        home = self.client.get('/').content.decode()
+        self.assertIn('Get the group', home)
+        self.assertIn('rel="manifest"', home)
+        self.assertIn('Forgot password?', self.client.get(reverse('login')).content.decode())

@@ -20,10 +20,13 @@ from django.conf.urls.static import static
 from django.templatetags.static import static as static_url
 from django.urls import path, include
 from django.views.generic import RedirectView
-from . import views
+from . import pwa, views
 
 urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url=static_url('home/assets/favicon-v2.ico'), permanent=False)),
+    path('manifest.webmanifest', pwa.manifest, name='pwa_manifest'),
+    path('sw.js', pwa.service_worker, name='pwa_service_worker'),
+    path('offline/', pwa.offline, name='pwa_offline'),
     path('admin/', admin.site.urls),
     path('', views.home, name='home'),
     path('accounts/', include('accounts.urls')),

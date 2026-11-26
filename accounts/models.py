@@ -38,6 +38,8 @@ class Profile(models.Model):
         DARK = 'dark', 'Dark'
 
     theme = models.CharField(max_length=10, choices=Theme.choices, default=Theme.SYSTEM)
+    # IANA name such as "Asia/Manila", detected from the browser. Decides what "today" means for this user.
+    timezone = models.CharField(max_length=64, blank=True)
     notify_trip_updates = models.BooleanField(default=True, verbose_name='Trip updates')
     notify_member_joins = models.BooleanField(default=True, verbose_name='New group members')
     notify_system = models.BooleanField(default=True, verbose_name='Notices from Wunderlust')

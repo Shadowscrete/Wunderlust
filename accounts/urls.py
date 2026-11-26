@@ -15,6 +15,8 @@ urlpatterns = [
 
     path('settings/', views.account_settings, name='account_settings'),
 
+    path('timezone/', views.update_timezone, name='update_timezone'),
+
     path('support/', views.support, name='support'),
 
     path('friends/', views.friends, name='friends'),
@@ -23,5 +25,10 @@ urlpatterns = [
     path('u/<str:username>/follow/', views.follow_toggle, name='follow_toggle'),
     path('u/<str:username>/report/', views.report_user, name='report_user'),
 
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('password-reset/', views.WunderlustPasswordResetView.as_view(), name='password_reset'),
+    path('password-reset/sent/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+
+    path('logout/', views.WunderlustLogoutView.as_view(), name='logout'),
 ]

@@ -1,0 +1,36 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{% static 'home/assets/favicon-v3.ico' %}" sizes="any">
+    <link rel="icon" href="{% static 'home/assets/favicon-v3.png' %}" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="{% static 'home/assets/apple-touch-icon-v3.png' %}">
+    <meta name="theme-color" content="#f5f3ed">
+    <title>{% block title %}Wunderlust{% endblock %} | Wunderlust</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=4">
+</head>
+<body class="auth-body">
+    <main class="auth-layout">
+        <section class="auth-visual" aria-label="A flight above the clouds">
+            <img src="{% static 'home/assets/plane-wing.jpg' %}" width="2200" height="1461" alt="An airplane wing above the clouds at sunset">
+            <div class="auth-visual-shade"></div>
+            <a class="auth-wordmark auth-wordmark-light" href="{% url 'home' %}">Wunderlust</a>
+            <div class="auth-visual-copy"><p>TRAVEL, YOUR WAY</p><h2>A little closer<br>to your <em>somewhere.</em></h2><span>Make the journey your own.</span></div>
+            <span class="auth-image-caption">ABOVE THE CLOUDS</span>
+        </section>
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <div class="auth-panel-top"><a class="auth-wordmark" href="{% url 'home' %}">Wunderlust</a><a class="back-home" href="{% url 'home' %}"><span aria-hidden="true">&#8592;&#xFE0E;</span> Back to home</a></div>
+            <div class="auth-content">
+                                {% block panel %}{% endblock %}
+            </div>
+            <p class="auth-footnote">Good journeys start wherever you are.</p>
+        </section>
+    </main>
+    <script src="{% static 'registration/auth.js' %}?v=2" defer></script>
+</body>
+</html>

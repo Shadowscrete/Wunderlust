@@ -3,4 +3,4 @@
 {% block code %}SESSION EXPIRED{% endblock %}
 {% block heading %}This form has expired{% endblock %}
 {% block message %}For your security, forms stop working after a while or after signing in elsewhere. Reload the page and submit it again.{% endblock %}
-{% block actions %}<button class="btn" type="button" onclick="history.back()">Go back</button><a class="btn btn-primary" href="/accounts/login/">Sign in again</a>{% endblock %}
+{% block actions %}<button class="btn" type="button" data-go-back>Go back</button><a class="btn btn-primary" href="/accounts/login/">Sign in again</a>{% endblock %}

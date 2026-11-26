@@ -107,12 +107,18 @@ class DeleteAccountForm(forms.Form):
 
 class AvatarForm(forms.Form):
     MAX_BYTES = 5 * 1024 * 1024
+    # A small file can still decode to a gigantic bitmap ("decompression bomb"). 40 megapixels is
+    # far above any phone camera, and well below what would exhaust server memory.
+    MAX_PIXELS = 40_000_000
     avatar = forms.ImageField()
 
     def clean_avatar(self):
         image = self.cleaned_data['avatar']
         if image.size > self.MAX_BYTES:
             raise forms.ValidationError('Please choose an image under 5 MB.')
+        width, height = getattr(image, 'image', None).size if getattr(image, 'image', None) else (0, 0)
+        if width * height > self.MAX_PIXELS:
+            raise forms.ValidationError('That image is too large. Please choose a smaller photo.')
         return image
 
     def processed_file(self):
@@ -121,6 +127,7 @@ class AvatarForm(forms.Form):
         from django.core.files.base import ContentFile
         from PIL import Image, ImageOps
 
+        Image.MAX_IMAGE_PIXELS = self.MAX_PIXELS  # Pillow refuses anything bigger instead of decoding it
         image = Image.open(self.cleaned_data['avatar'])
         image = ImageOps.exif_transpose(image).convert('RGB')
         image = ImageOps.fit(image, (400, 400), Image.LANCZOS)

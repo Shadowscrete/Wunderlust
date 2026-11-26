@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Exists, F, OuterRef, Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -26,6 +26,13 @@ from .models import trip_readiness
 from accounts.social import avatar_url_for, initials_for
 
 User = get_user_model()
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
+def dismiss_walkthrough(request):
+    User.objects.filter(pk=request.user.pk, walkthrough_pending=True).update(walkthrough_pending=False)
+    return HttpResponse(status=204)
 
 
 def dashboard_home(request):

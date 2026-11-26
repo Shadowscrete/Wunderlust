@@ -1,0 +1,42 @@
+<dialog class="modal walkthrough" id="app-walkthrough" aria-label="How Wunderlust works"
+        {% if request.user.walkthrough_pending %}data-first-walkthrough{% endif %}>
+    <div class="modal-body">
+        <div class="modal-head walkthrough-header">
+            <p data-walkthrough-progress></p>
+            <button class="modal-close" type="button" data-dialog-close aria-label="Close walkthrough">&times;</button>
+        </div>
+        <section data-walkthrough-step data-spotlight=".sidebar a[href='{% url 'trends' %}']">
+            <h2 tabindex="-1">Find your next destination</h2>
+            <p>Open <strong>Trends</strong> to see which city guides people are reading on Wikivoyage. Select a city to read its guide.</p>
+            <div class="walkthrough-preview"><span>Sidebar</span><strong>Trends</strong></div>
+        </section>
+        <section data-walkthrough-step data-spotlight=".trip-heading-actions, .sidebar a[href='{% url 'trip_list' %}']" hidden>
+            <h2 tabindex="-1">Create or join a trip</h2>
+            <p>In <strong>My trips</strong>, choose <strong>Plan a trip</strong> and enter your destination and dates. If someone gave you a trip code, choose <strong>Join a trip</strong> and enter it there.</p>
+            <div class="walkthrough-preview"><span>My trips</span><strong>Join a trip</strong><strong>Plan a trip</strong></div>
+        </section>
+        <section data-walkthrough-step data-spotlight="#id_generate_itinerary, .activity-add-form > button" hidden>
+            <h2 tabindex="-1">Build your itinerary</h2>
+            <p>Turn on suggestions when you create a trip to get ideas for places to visit. Open <strong>Itinerary</strong> to add your own activities and give them a start time or leave them flexible.</p>
+            <div class="walkthrough-preview"><span>Trip overview / Itinerary</span><strong>Add activity</strong></div>
+        </section>
+        <section data-walkthrough-step data-spotlight="#tab-preparation" hidden>
+            <h2 tabindex="-1">Get ready to travel</h2>
+            <p>Use <strong>Preparation</strong> to check off travel documents and customize your packing list. Open <strong>Travel information</strong> to add flights and check their status when available.</p>
+            <div class="walkthrough-preview"><span>Trip tabs</span><strong>Preparation</strong><span>Travel information</span></div>
+        </section>
+        <section data-walkthrough-step data-spotlight=".invite-section button" hidden>
+            <h2 tabindex="-1">Plan together</h2>
+            <p>Open your trip and create an invite. Share the link or trip code so others can join and check off their own preparation items.</p>
+            <div class="walkthrough-preview"><span>Trip overview</span><strong>Create trip invite</strong></div>
+        </section>
+        {% if request.user.walkthrough_pending %}
+        <form action="{% url 'dismiss_walkthrough' %}" method="post" data-walkthrough-dismiss hidden>{% csrf_token %}</form>
+        {% endif %}
+        <div class="modal-actions walkthrough-actions">
+            <button type="button" class="text-button walkthrough-skip" data-dialog-close>Skip walkthrough</button>
+            <button type="button" class="button button-secondary" data-walkthrough-back>Back</button>
+            <button type="button" class="button button-primary" data-walkthrough-next>Next</button>
+        </div>
+    </div>
+</dialog>

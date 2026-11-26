@@ -2670,3 +2670,71 @@ html{scrollbar-gutter:stable}
 .trend-list li { padding: .75rem .25rem; border-bottom: 1px solid var(--line); }
 .trend-list a { color: var(--ink); font-weight: 600; }
 .trend-list small { margin-inline-start: .8rem; color: var(--muted); }
+
+.walkthrough { width: min(500px, calc(100vw - 32px)); }
+.walkthrough .modal-body { padding: clamp(18px, 5vw, 28px); gap: 16px; }
+.walkthrough-header { align-items: center; }
+.walkthrough-header p { font-weight: 600; color: var(--muted); }
+.walkthrough section h2 { margin: 0 0 .65rem; font: 600 1.65rem/1.2 Lora, Georgia, serif; }
+.walkthrough section h2:focus { outline: none; }
+.walkthrough section p { margin: 0; color: var(--ink); line-height: 1.65; }
+.walkthrough-actions { flex-wrap: wrap; align-items: center; }
+.walkthrough-actions .button, .walkthrough-skip { min-height: 44px; }
+.walkthrough-skip { margin-inline-end: auto; }
+.walkthrough-actions button:disabled { opacity: .55; cursor: default; }
+.walkthrough-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--page);
+  color: var(--ink);
+  font-size: 13px;
+}
+.walkthrough-preview strong {
+  padding: 5px 9px;
+  border: 1px solid var(--green);
+  border-radius: 5px;
+  background: var(--green-soft);
+}
+.walkthrough::backdrop { background: rgb(19 30 23 / 38%); }
+.walkthrough-highlight { outline: 2px solid #6ca580; outline-offset: 3px; border-radius: 8px; }
+.walkthrough[data-spotlight-position] {
+  position: fixed;
+  inset: var(--walkthrough-top) auto auto var(--walkthrough-left);
+  margin: 0;
+}
+.walkthrough[data-spotlight-position] .walkthrough-preview { display: none; }
+.walkthrough[data-spotlight-position]::backdrop {
+  clip-path: polygon(evenodd,
+    0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    var(--spotlight-left) var(--spotlight-top),
+    var(--spotlight-right) var(--spotlight-top),
+    var(--spotlight-right) var(--spotlight-bottom),
+    var(--spotlight-left) var(--spotlight-bottom),
+    var(--spotlight-left) var(--spotlight-top), 0 0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .walkthrough[open] { animation: walkthrough-pop 360ms ease-out both; }
+  .walkthrough[open] [data-walkthrough-step]:not([hidden]) {
+    animation: walkthrough-step-in 280ms ease-out both;
+  }
+}
+
+@keyframes walkthrough-pop {
+  0% { opacity: 0; transform: translateY(12px) scale(.96); }
+  60% { opacity: 1; transform: translateY(-3px) scale(1.015); }
+  82% { transform: translateY(1px) scale(.997); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes walkthrough-step-in {
+  0% { opacity: 0; transform: translateY(6px); }
+  65% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 1; transform: none; }
+}

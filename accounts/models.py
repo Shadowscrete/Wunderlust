@@ -14,6 +14,7 @@ class User(AbstractUser):
         ADMINISTRATOR = 'ADMINISTRATOR', 'Administrator'
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.TRAVELER)
+    walkthrough_pending = models.BooleanField(default=True)
     objects = UserManager()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

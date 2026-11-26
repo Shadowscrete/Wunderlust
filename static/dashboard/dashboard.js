@@ -176,6 +176,122 @@ function assertJson(response) {
 })();
 
 (() => {
+  const dialog = document.getElementById('app-walkthrough');
+  if (!dialog) return;
+
+  const steps = [...dialog.querySelectorAll('[data-walkthrough-step]')];
+  const progress = dialog.querySelector('[data-walkthrough-progress]');
+  const back = dialog.querySelector('[data-walkthrough-back]');
+  const next = dialog.querySelector('[data-walkthrough-next]');
+  const dismiss = dialog.querySelector('[data-walkthrough-dismiss]');
+  const profile = document.querySelector('.profile-trigger');
+  let activeStep = 0;
+  let saving = false;
+  let highlighted;
+
+  function clearSpotlight() {
+    highlighted?.classList.remove('walkthrough-highlight');
+    highlighted = null;
+    dialog.removeAttribute('data-spotlight-position');
+  }
+
+  function updateSpotlight() {
+    clearSpotlight();
+    if (!dialog.open) return;
+    const viewport = document.documentElement;
+    const candidates = steps[activeStep].dataset.spotlight.split(',').flatMap((selector) =>
+      [...document.querySelectorAll(selector)]);
+    const target = candidates.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return getComputedStyle(element).visibility === 'visible' && rect.width > 0 && rect.height > 0 &&
+        rect.left >= 0 && rect.right <= viewport.clientWidth &&
+        rect.top >= 0 && rect.bottom <= viewport.clientHeight;
+    });
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const edge = 16;
+    const gap = 18;
+    const width = dialog.offsetWidth;
+    const height = dialog.offsetHeight;
+    const bound = (value, max) => Math.max(edge, Math.min(value, max - edge));
+    const x = bound((rect.left + rect.right - width) / 2, viewport.clientWidth - width);
+    const y = bound((rect.top + rect.bottom - height) / 2, viewport.clientHeight - height);
+    const placements = [
+      [rect.right + gap, y],
+      [rect.left - width - gap, y],
+      [x, rect.bottom + gap],
+      [x, rect.top - height - gap],
+    ];
+    const placement = placements.find(([left, top]) => left >= edge && top >= edge &&
+      left + width <= viewport.clientWidth - edge && top + height <= viewport.clientHeight - edge);
+    if (!placement) return;
+    const [left, top] = placement;
+    highlighted = target;
+    highlighted.classList.add('walkthrough-highlight');
+    dialog.setAttribute('data-spotlight-position', '');
+    dialog.style.setProperty('--walkthrough-left', `${left}px`);
+    dialog.style.setProperty('--walkthrough-top', `${top}px`);
+    dialog.style.setProperty('--spotlight-left', `${Math.max(0, rect.left - 6)}px`);
+    dialog.style.setProperty('--spotlight-top', `${Math.max(0, rect.top - 6)}px`);
+    dialog.style.setProperty('--spotlight-right', `${rect.right + 6}px`);
+    dialog.style.setProperty('--spotlight-bottom', `${rect.bottom + 6}px`);
+  }
+
+  function showStep(index) {
+    activeStep = index;
+    steps.forEach((step, position) => { step.hidden = position !== index; });
+    progress.textContent = `Step ${index + 1} of ${steps.length}`;
+    back.disabled = index === 0;
+    next.textContent = index === steps.length - 1 ? 'Done' : 'Next';
+    updateSpotlight();
+    if (dialog.open) steps[index].querySelector('h2').focus();
+  }
+
+  function openWalkthrough() {
+    if (dialog.open) return;
+    showStep(0);
+    dialog.showModal();
+    updateSpotlight();
+    steps[0].querySelector('h2').focus();
+  }
+
+  document.querySelector('[data-walkthrough-open]').addEventListener('click', () => {
+    profile.click();
+    profile.focus();
+    openWalkthrough();
+  });
+  back.addEventListener('click', () => showStep(activeStep - 1));
+  next.addEventListener('click', () => {
+    if (activeStep === steps.length - 1) dialog.close();
+    else showStep(activeStep + 1);
+  });
+  dialog.addEventListener('close', async () => {
+    clearSpotlight();
+    if (!dismiss?.isConnected || saving) return;
+    saving = true;
+    try {
+      const response = await fetch(dismiss.action, {
+        method: 'POST',
+        body: new FormData(dismiss),
+        keepalive: true,
+      });
+      if (response.status !== 204) throw new Error(String(response.status));
+      dismiss.remove();
+    } catch (error) {
+      showErrorToast(error, 'Could not save your walkthrough preference.');
+    } finally {
+      saving = false;
+    }
+  });
+  window.addEventListener('resize', updateSpotlight);
+  window.addEventListener('scroll', updateSpotlight, { capture: true, passive: true });
+
+  if (dialog.hasAttribute('data-first-walkthrough') && !document.querySelector('dialog[open]')) {
+    openWalkthrough();
+  }
+})();
+
+(() => {
   const search = document.querySelector('[data-help-search]');
   if (!search) return;
   const topics = [...document.querySelectorAll('[data-help-topic]')];

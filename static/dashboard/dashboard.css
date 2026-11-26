@@ -2716,7 +2716,6 @@ html{scrollbar-gutter:stable}
 .trend-city h2 { margin: 0 0 3px; font: 600 20px/1.2 Lora, Georgia, serif; overflow-wrap: anywhere; }
 .trend-city > span, .trend-card small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .trend-arrow { color: var(--muted); font-size: 17px; }
-.trend-description { margin: 0 14px 10px; font-size: 13px; line-height: 1.5; }
 .trend-card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2748,7 +2747,7 @@ html{scrollbar-gutter:stable}
   }
   .trend-list-with-podium li:nth-child(-n+3) h2 { font-size: 14px; }
   .trend-list-with-podium li:nth-child(-n+3) .trend-arrow { display: none; }
-  .trend-list-with-podium li:nth-child(-n+3) :is(.trend-description, .trend-credit) {
+  .trend-list-with-podium li:nth-child(-n+3) .trend-credit {
     margin-inline: 0;
     padding-inline: 6px;
     font-size: 11px;

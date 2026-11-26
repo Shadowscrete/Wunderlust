@@ -208,7 +208,7 @@ def travel_information_overview(request):
 @role_required(User.Role.TRAVELER)
 def trip_create(request):
     destination = request.GET.get('destination')
-    initial = {'destination': destination, 'country': CITIES[destination][0]} if destination in CITIES else None
+    initial = {'destination': destination, 'country': CITIES[destination]} if destination in CITIES else None
     form = TripForm(request.POST if request.method == 'POST' else None, initial=initial)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():

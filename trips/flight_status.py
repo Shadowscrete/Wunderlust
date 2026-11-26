@@ -13,6 +13,7 @@ from urllib.request import urlopen
 
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,12 @@ LIVE_WINDOW = timedelta(days=1)
 
 STATUS_LABELS = {
     'scheduled': 'Scheduled',
-    'active': 'In the air',
+    'active': 'Active ? phase unconfirmed',
+    'departing': 'Departing',
+    'boarding': 'Boarding',
+    'taxiing': 'Taxiing',
+    'airborne': 'In the air',
+    'unknown': 'Status unavailable',
     'landed': 'Landed',
     'cancelled': 'Cancelled',
     'incident': 'Incident',
@@ -55,9 +61,24 @@ def _endpoint_side(side):
 
 
 def _summarise(record):
-    status = record.get('flight_status') or 'unknown'
+    status = (record.get('flight_status') or 'unknown').strip().lower()
+    departure = record.get('departure') or {}
+    arrival = record.get('arrival') or {}
+    live = record.get('live') or {}
+    if status in ('active', 'scheduled', 'unknown'):
+        if arrival.get('actual') or arrival.get('actual_runway'):
+            status = 'landed'
+        elif live.get('is_ground') is False:
+            status = 'airborne'
+        elif live.get('is_ground') is True and 0 < (live.get('speed_horizontal') or 0) <= 40:
+            status = 'taxiing'
+        elif departure.get('actual_runway') and live.get('is_ground') is not True:
+            status = 'airborne'
+        elif departure.get('actual'):
+            status = 'departing'
     return {
         'status': status,
+        'checked_at': timezone.now().isoformat(),
         'status_label': STATUS_LABELS.get(status, status.title()),
         'departure': _endpoint_side(record.get('departure')),
         'arrival': _endpoint_side(record.get('arrival')),
@@ -71,7 +92,7 @@ def get_flight_status(flight):
     if not api_key:
         raise FlightStatusError('Live flight status is not configured.')
 
-    cache_key = f'flight-status:{flight.flight_number}:{flight.flight_date.isoformat()}'
+    cache_key = f'flight-status:v2:{flight.flight_number}:{flight.flight_date.isoformat()}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached or None  # {} caches "not found"

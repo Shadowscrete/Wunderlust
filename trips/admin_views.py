@@ -408,8 +408,8 @@ def admin_notices(request):
 @admin_required
 def admin_inbox(request):
     items = Notification.objects.filter(user=request.user).order_by('-created_at')
+    items.filter(is_read=False).update(is_read=True)
     if request.method == 'POST' and request.POST.get('action') == 'read_all':
-        items.filter(is_read=False).update(is_read=True)
         return redirect('admin_inbox')
     return render(request, 'dashboard/admin/inbox.html', {'page_obj': _page(request, items)})
 

@@ -19,6 +19,7 @@ from .decorators import role_required
 from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, SystemNotificationForm, TravelInfoForm, TripForm, TripTravelInfoForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
+from .trends import destination_trends
 from .recommendations import ideas_for
 from .flight_status import FlightStatusError, get_flight_status, is_trackable
 from .models import trip_readiness
@@ -73,9 +74,7 @@ def traveler_dashboard(request):
         'activities': recent_activities,
         'group_memberships': group_memberships[:5],
         'travel_info': travel_info,
-        'today_notification_count': Notification.objects.filter(
-            _notification_scope(request.user), created_at__date=timezone.localdate(), is_read=False
-        ).count(),
+        'today_notification_count': _today_unread(request.user).count(),
     })
 
 
@@ -118,7 +117,22 @@ def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_upd
 
 def _build_itinerary(trip, place_names):
     day_count = (trip.end_date - trip.start_date).days + 1
-    place_index = 0
+    def place_key(name):
+        return ' '.join(name.casefold().split())
+
+    places = {}
+    for name in place_names:
+        places.setdefault(place_key(name), name)
+    requested = iter(places.values())
+    seen = set(places)
+    suggestions = []
+    for title, location in ideas_for(trip.destination, trip.country):
+        key = place_key(location or title)
+        if key in seen or any(f' {place} ' in f' {place_key(title)} ' for place in places):
+            continue
+        seen.add(key)
+        suggestions.append((title, location))
+    remaining_ideas = iter(suggestions)
     for index in range(day_count):
         current_date = trip.start_date + timedelta(days=index)
         day = ItineraryDay.objects.create(
@@ -127,10 +141,8 @@ def _build_itinerary(trip, place_names):
             title=f'Day {index + 1}',
             notes=f'Suggested starting points for {trip.destination}, {trip.country}. Adjust to your pace.',
         )
-        ideas = ideas_for(trip.destination, trip.country)
-        if place_names:
-            selected_place = place_names[place_index % len(place_names)]
-            place_index += 1
+        selected_place = next(requested, None)
+        if selected_place:
             Activity.objects.create(
                 day=day,
                 title=f'Explore {selected_place}',
@@ -139,7 +151,10 @@ def _build_itinerary(trip, place_names):
                 notes='A place you added to this trip.',
                 is_recommended=True,
             )
-        idea, location = ideas[index % len(ideas)]
+        suggestion = next(remaining_ideas, None)
+        if suggestion is None:
+            continue
+        idea, location = suggestion
         Activity.objects.create(
             day=day,
             title=idea,
@@ -152,12 +167,24 @@ def _build_itinerary(trip, place_names):
 
 @role_required(User.Role.TRAVELER)
 def trip_list(request):
+    code = ''
+    error = ''
+    if request.method == 'POST':
+        code = request.POST.get('invite_code', '').strip().upper()
+        if GroupTrip.objects.filter(invite_code=code).exists():
+            return redirect('trip_join', invite_code=code)
+        error = 'Trip code not found. Check the code with your organizer and try again.'
     # One query for the whole list: group info is joined and checklist counts are annotated,
     # instead of extra queries per trip card.
     trips = _accessible_trips(request.user).select_related('owner', 'group_trip').annotate(
         checklist_total=Count('checklist_items', distinct=True),
     ).order_by('start_date')
-    return render(request, 'dashboard/trip_list.html', {'trips': trips})
+    return render(request, 'dashboard/trip_list.html', {'trips': trips, 'invite_code': code, 'code_error': error})
+
+
+@role_required(User.Role.TRAVELER)
+def trends(request):
+    return render(request, 'dashboard/trends.html', destination_trends())
 
 
 @role_required(User.Role.TRAVELER)
@@ -430,6 +457,18 @@ def checklist_toggle(request, item_id):
 
 @role_required(User.Role.TRAVELER)
 @require_POST
+def checklist_remove(request, item_id):
+    item = get_object_or_404(
+        Checklist, pk=item_id, trip__in=_accessible_trips(request.user), is_mandatory=False,
+    )
+    trip_id = item.trip_id
+    item.delete()
+    messages.success(request, f'{item.title} removed from the preparation list.')
+    return redirect(f"{reverse('trip_detail', args=[trip_id])}#preparation")
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
 def checklist_quantity_update(request, item_id):
     item = get_object_or_404(Checklist.objects.select_related('trip'), pk=item_id, trip__in=_accessible_trips(request.user), is_document=False)
     previous = item.quantity
@@ -537,17 +576,29 @@ def activity_list(request):
     return render(request, 'dashboard/activities.html', {'page_obj': page, 'kind': kind})
 
 
+def _today_unread(user):
+    return _with_read_state(Notification.objects.filter(
+        _notification_scope(user), created_at__date=timezone.localdate(),
+    ), user).filter(Q(user=user, is_read=False) | Q(user__isnull=True, seen=False))
+
+
 @role_required(User.Role.TRAVELER, User.Role.ADMINISTRATOR)
 def live_notification_count(request):
+    unread = _today_unread(request.user)
+    if request.method == 'POST':
+        with transaction.atomic():
+            unread.filter(user=request.user).update(is_read=True)
+            shared_ids = unread.filter(user__isnull=True).values_list('pk', flat=True)
+            NotificationRead.objects.bulk_create([
+                NotificationRead(notification_id=pk, user=request.user) for pk in shared_ids
+            ], ignore_conflicts=True)
     day_notifications = _with_read_state(Notification.objects.filter(
         _notification_scope(request.user),
         created_at__date=timezone.localdate(),
     ), request.user).select_related('trip').order_by('-created_at')
     notifications = []
-    unread_count = 0
     for item in day_notifications[:30]:
         is_read = _is_read(item)
-        unread_count += not is_read
         notifications.append({
             'id': item.pk,
             'title': item.title,
@@ -558,7 +609,7 @@ def live_notification_count(request):
             'can_mark_read': not is_read,
             'mark_url': reverse('notification_mark_read', kwargs={'notification_id': item.pk}),
         })
-    return JsonResponse({'count': unread_count, 'notifications': notifications})
+    return JsonResponse({'count': unread.count(), 'notifications': notifications})
 
 
 @role_required(User.Role.TRAVELER, User.Role.ADMINISTRATOR)

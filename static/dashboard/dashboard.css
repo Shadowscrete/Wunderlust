@@ -1245,7 +1245,7 @@ td strong  {
 }
 .filter-bar  {
   display:grid;
-  grid-template-columns:1fr 1fr
+  grid-template-columns:repeat(2,minmax(0,1fr))
 }
 .search-field  {
   grid-column:1/-1
@@ -1331,11 +1331,13 @@ td strong  {
 }
 .form-grid  {
   display:grid;
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(2,minmax(0,1fr));
   gap:18px 20px
 }
 .form-field  {
   display:grid;
+  min-width:0;
+  grid-template-columns:minmax(0,1fr);
   gap:6px;
   align-content:start
 }
@@ -1987,7 +1989,7 @@ td strong  {
   padding:20px
 }
 .form-grid  {
-  grid-template-columns:1fr;
+  grid-template-columns:minmax(0,1fr);
   gap:14px
 }
 .full-field  {
@@ -2056,9 +2058,7 @@ td strong  {
 .inline-add-form  {
   flex-wrap:wrap
 }
-.inline-add-form input:first-of-type  {
-  min-width:calc(100% - 80px)
-}
+
 .trip-progress-banner h2  {
   font-size:14px
 }
@@ -2175,7 +2175,7 @@ button.topbar-icon-button{border:0;background:none;font:inherit;cursor:pointer}
 .profile-stat{padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
 .profile-stat strong{display:block;font-size:26px;font-weight:600;color:var(--green)}
 .profile-stat span{font-size:12px;color:var(--muted)}
-.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;align-items:start}
 .profile-card h2{margin:0 0 14px;font-size:16px}
 .profile-card-head{display:flex;align-items:baseline;justify-content:space-between}
 .profile-card-head a{font-size:12px;color:var(--green);text-decoration:none;font-weight:600}
@@ -2647,3 +2647,26 @@ html{scrollbar-gutter:stable}
 .page-heading form{flex-shrink:0}
 @media(max-width:900px){.admin-chart-grid{grid-template-columns:1fr}}
 @media(max-width:600px){.bar-list li{grid-template-columns:minmax(0,45%) 1fr auto}.admin-pagination{flex-wrap:wrap;justify-content:center}.report-card-head{flex-direction:column}}
+
+.dashboard-section, .settings-form, .management-form p, .search-field, .audience-choice {
+  min-inline-size: 0;
+}
+.dashboard-body :where(input, select, textarea) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+@media (max-width: 700px) {
+  .inline-form, .settings-actions { flex-wrap: wrap; }
+  .form-field, .field-error, .report-details { overflow-wrap: anywhere; }
+}
+
+.trip-heading-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.trip-heading-actions .join-trip-trigger { background: #fff; color: #344437; border-color: #c8d0ca; }
+.trip-heading-actions .join-trip-trigger:hover { background: #fff; border-color: #718175; }
+
+.trends-prompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.trends-prompt p { margin: 4px 0 0; color: var(--muted); }
+.trend-list { padding-inline-start: 2rem; }
+.trend-list li { padding: .75rem .25rem; border-bottom: 1px solid var(--line); }
+.trend-list a { color: var(--ink); font-weight: 600; }
+.trend-list small { margin-inline-start: .8rem; color: var(--muted); }

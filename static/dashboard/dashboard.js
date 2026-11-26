@@ -48,7 +48,7 @@ function assertJson(response) {
     return empty;
   }
 
-  function buildRow(notification, compact, csrfInput) {
+  function buildRow(notification, compact) {
     const row = document.createElement('article');
     row.className = compact ? 'inbox-item' : 'notification-page-row';
     const dot = document.createElement('span');
@@ -63,86 +63,44 @@ function assertJson(response) {
     meta.textContent = [notification.time, notification.trip].filter(Boolean).join(' · ');
     copy.append(title, message, meta);
     row.append(dot, copy);
-    if (notification.can_mark_read && csrfInput) {
-      const form = document.createElement('form');
-      form.method = 'post';
-      form.action = notification.mark_url;
-      const token = document.createElement('input');
-      token.type = 'hidden';
-      token.name = 'csrfmiddlewaretoken';
-      token.value = csrfInput.value;
-      const next = document.createElement('input');
-      next.type = 'hidden';
-      next.name = 'next';
-      next.value = window.location.pathname + window.location.search;
-      const button = document.createElement('button');
-      button.className = 'text-button';
-      button.type = 'submit';
-      button.textContent = 'Mark read';
-      form.append(token, next, button);
-      row.append(form);
-    }
     return row;
   }
 
   function renderNotifications(notifications) {
-    const csrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
     document.querySelectorAll('[data-notification-feed]').forEach((feed) => {
+      feed.setAttribute('aria-busy', 'false');
       const compact = feed.hasAttribute('data-compact');
       if (!notifications.length) {
         feed.replaceChildren(buildEmpty(compact));
         return;
       }
-      feed.replaceChildren(...notifications.map((n) => buildRow(n, compact, csrfInput)));
+      feed.replaceChildren(...notifications.map((n) => buildRow(n, compact)));
     });
   }
 
+  let latestRequest = 0;
   async function refreshNotificationCount() {
     if (!endpoint || !countBadge) return;
+    const requestId = ++latestRequest;
+    const opened = !document.hidden && !document.getElementById('inbox-dropdown').hidden;
     try {
       const response = await fetch(endpoint, {
         credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        method: opened ? 'POST' : 'GET',
+        headers: opened ? { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value } : {},
         cache: 'no-store',
       });
-      if (!response.ok) return;
-      const data = await response.json();
+      const data = await assertJson(response);
+      if (requestId !== latestRequest) return;
       countBadge.textContent = String(data.count);
       countBadge.hidden = data.count === 0;
       renderNotifications(data.notifications || []);
-    } catch (_) {
-      // Keep the last rendered count when the connection is temporarily unavailable.
+    } catch (err) {
+      if (opened && requestId === latestRequest) showErrorToast(err, 'Could not refresh the inbox. Please reopen it to retry.');
     }
   }
 
-  // "Mark read" saves in the background instead of reloading the page.
-  // Capture phase so it runs before the page-loading skeleton handler.
-  document.addEventListener('submit', async (event) => {
-    const form = event.target;
-    if (!(form instanceof HTMLFormElement) || !/\/notifications\/\d+\/read\/?$/.test(new URL(form.action, location.href).pathname)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (form.dataset.busy) return;
-    form.dataset.busy = '1';
-    const row = form.closest('.inbox-item, .notification-page-row, article, li');
-    try {
-      const response = await fetch(form.action, {
-        method: 'POST',
-        body: new FormData(form),
-        credentials: 'same-origin',
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-      });
-      await assertJson(response);
-      const dot = row && row.querySelector('.notification-dot');
-      if (dot) dot.classList.add('read');
-      form.remove();
-      refreshNotificationCount();
-    } catch (err) {
-      showErrorToast(err, 'Couldn’t mark that notification as read. Please try again.');
-      delete form.dataset.busy;
-    }
-  }, true);
-
+  document.getElementById('inbox-dropdown')?.addEventListener('inbox-open', refreshNotificationCount);
   refreshNotificationCount();
   window.setInterval(refreshNotificationCount, 60000);
 
@@ -173,6 +131,7 @@ function assertJson(response) {
   const setOpen = (menu, open) => {
     const { trigger, panel } = parts(menu);
     panel.hidden = !open;
+    if (open && panel.id === 'inbox-dropdown') panel.dispatchEvent(new Event('inbox-open'));
     trigger.setAttribute('aria-expanded', String(open));
   };
   menus.forEach((menu) => {

@@ -67,4 +67,4 @@ def ideas_for(destination, country):
     city_ideas = CITY_IDEAS.get(city)
     if city_ideas:
         return city_ideas
-    return [(regional_ideas[index % len(regional_ideas)] if regional_ideas else DEFAULT_IDEAS[index % len(DEFAULT_IDEAS)], destination) for index in range(5)]
+    return [(title, '') for title in regional_ideas or DEFAULT_IDEAS]

@@ -1,13 +1,11 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}Notifications | Wunderlust admin{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">YOUR INBOX</p><h1>Notifications</h1><p class="page-subtitle">Alerts for the admin team, such as new reports.</p></div>
-    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="read_all"><button class="button button-secondary" type="submit">Mark all as read</button></form></div>
+<div class="page-heading"><div><p class="eyebrow">YOUR INBOX</p><h1>Notifications</h1><p class="page-subtitle">Alerts for the admin team, such as new reports.</p></div></div>
 <section class="dashboard-section admin-section">
     <div class="admin-entry-list">{% for item in page_obj %}<article>
         <span class="notification-dot{% if item.is_read %} read{% endif %}"></span>
         <div><strong>{{ item.title }}</strong><small>{{ item.message }}</small><small>{{ item.created_at|date:"M j, Y g:i A" }}</small></div>
-        {% if not item.is_read %}<form method="post" action="{% url 'notification_mark_read' item.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="text-button" type="submit">Mark read</button></form>{% endif %}
     </article>{% empty %}<p class="empty-inline">No notifications yet.</p>{% endfor %}</div>
     {% include 'dashboard/admin/_pagination.html' %}
 </section>

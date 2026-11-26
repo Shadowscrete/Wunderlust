@@ -1,0 +1,12 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Trends | Wunderlust{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>Trends</h1><p class="page-subtitle">See which city guides travelers are reading on English Wikivoyage.</p></div></div>
+<section class="dashboard-section">
+    <div class="section-heading"><div><h2>Popular city guides</h2>{% if day %}<p class="page-subtitle">Ranked by page views among our selected cities on {{ day|date:"F j, Y" }} (UTC).</p>{% endif %}</div></div>
+    {% if cities %}<ol class="trend-list">
+        {% for city in cities %}<li><a href="https://en.wikivoyage.org/wiki/{{ city.slug|urlencode }}">{{ city.name }}</a><small>{{ city.views }} views</small></li>{% endfor %}
+    </ol>{% else %}<p>Recent guide rankings are temporarily unavailable. <a href="https://en.wikivoyage.org/wiki/Destinations">Browse destinations on Wikivoyage</a>.</p>{% endif %}
+    <small>Source: <a href="https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/reference/page-views.html">Wikimedia Pageviews</a></small>
+</section>
+{% endblock %}

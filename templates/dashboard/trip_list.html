@@ -1,6 +1,27 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}My trips | Wunderlust{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">YOUR PLANS</p><h1>My trips</h1><p class="page-subtitle">Trips you’re planning and journeys shared with you.</p></div><a class="button button-primary" href="{% url 'trip_create' %}">Plan a trip <span aria-hidden="true">+</span></a></div>
+<div class="page-heading"><div><p class="eyebrow">YOUR PLANS</p><h1>My trips</h1><p class="page-subtitle">Trips you’re planning and journeys shared with you.</p></div>
+    <div class="trip-heading-actions">
+        <button class="button button-secondary join-trip-trigger" type="button" data-dialog-open="join-trip-dialog" aria-haspopup="dialog">Join a trip</button>
+        <a class="button button-primary" href="{% url 'trip_create' %}">Plan a trip <span aria-hidden="true">+</span></a>
+    </div>
+</div>
+<dialog class="modal" id="join-trip-dialog" aria-labelledby="join-trip-title"{% if code_error %} data-open-on-load{% endif %}>
+    <form method="post" class="modal-body">
+        {% csrf_token %}
+        <div class="modal-head">
+            <h2 id="join-trip-title">Join a trip</h2>
+            <button type="button" class="modal-close" data-dialog-close aria-label="Close">&times;</button>
+        </div>
+        <div class="form-field">
+            <label for="invite-code">Trip code from your organizer</label>
+            <input id="invite-code" name="invite_code" value="{{ invite_code }}" autocapitalize="characters" spellcheck="false" autofocus required{% if code_error %} aria-invalid="true" aria-describedby="invite-code-error"{% endif %}>
+            {% if code_error %}<span class="field-error" id="invite-code-error" role="alert">{{ code_error }}</span>{% endif %}
+        </div>
+        <div class="modal-actions"><button type="submit" class="button button-primary">Find trip</button></div>
+    </form>
+</dialog>
+<aside class="dashboard-section trends-prompt"><div><strong>Not sure where to go?</strong><p>Explore the city guides travelers are reading now.</p></div><a class="button button-secondary" href="{% url 'trends' %}">Explore trends</a></aside>
 <div class="trip-list-grid">{% for trip in trips %}<a class="trip-list-card" href="{% url 'trip_detail' trip.pk %}"><div class="trip-list-top"><span class="trip-monogram">{{ trip.destination|slice:":2"|upper }}</span><span class="status-pill status-{{ trip.status|lower }}">{{ trip.get_status_display }}</span></div><h2>{{ trip.destination }}{% if trip.country %}<span>, {{ trip.country }}</span>{% endif %}</h2><p>{{ trip.start_date|date:"M j" }} – {{ trip.end_date|date:"M j, Y" }}</p><div class="trip-list-meta"><span>{% if trip.is_group_trip %}Shared trip{% else %}Private trip{% endif %}</span><span>{{ trip.checklist_total }} preparation items</span></div><span class="trip-card-link">Open trip <span aria-hidden="true">→︎</span></span></a>{% empty %}<section class="empty-state empty-trips"><div class="empty-monogram">W</div><strong>Your next trip starts with an idea.</strong><p>Create a trip to organize your itinerary, travel information and preparation checklist in one place.</p><a class="button button-primary" href="{% url 'trip_create' %}">Plan your first trip</a></section>{% endfor %}</div>
 {% endblock %}

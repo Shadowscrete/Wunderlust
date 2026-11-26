@@ -93,6 +93,28 @@ class AdminPanelTests(TestCase):
         self.login(self.bob)
         self.assertEqual(self.client.get(reverse('live_notification_count')).json()['count'], 1)
 
+    def test_opening_inbox_reads_personal_and_shared_notifications(self):
+        endpoint = reverse('live_notification_count')
+        Notification.objects.bulk_create([Notification(user=self.alice, title='Trip update') for _ in range(31)])
+        Notification.objects.create(title='System notice')
+        self.login(self.alice)
+        self.assertEqual(self.client.get(endpoint).json()['count'], 32)
+        for _ in range(2):
+            result = self.client.post(endpoint).json()
+            self.assertEqual(result['count'], 0)
+            self.assertTrue(all(item['is_read'] for item in result['notifications']))
+        Notification.objects.create(user=self.alice, title='Later update')
+        self.assertEqual(self.client.get(endpoint).json()['count'], 1)
+        self.login(self.bob)
+        self.assertEqual(self.client.get(endpoint).json()['count'], 1)
+
+    def test_opening_admin_inbox_reads_admin_alerts(self):
+        notice = Notification.objects.create(user=self.admin, title='Report received')
+        self.login(self.admin)
+        self.client.get(reverse('admin_inbox'))
+        notice.refresh_from_db()
+        self.assertTrue(notice.is_read)
+
     def test_direct_notice_requires_active_traveler(self):
         self.login(self.admin)
         self.client.post(reverse('admin_notices'), {'notice-audience': 'one', 'notice-recipient': 'boss', 'notice-title': 'Hi'})
@@ -106,3 +128,71 @@ class AdminPanelTests(TestCase):
         self.trip.refresh_from_db()
         self.assertEqual(self.trip.status, Trip.Status.CANCELLED)
         self.assertTrue(Notification.objects.filter(user=self.alice, trip=self.trip).exists())
+
+
+class PreparationAndItineraryTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('planner')
+        self.client.force_login(self.owner)
+        self.start = timezone.localdate() + timedelta(days=1)
+
+    def create_trip(self, city, country):
+        response = self.client.post(reverse('trip_create'), {
+            'destination': city, 'country': country, 'start_date': self.start,
+            'end_date': self.start + timedelta(days=14), 'has_ticket': 'no',
+            'generate_itinerary': 'on', 'places': 'Nishiki Market\nnishiki  market',
+        })
+        self.assertEqual(response.status_code, 302)
+        return Trip.objects.get(owner=self.owner)
+
+    def test_optional_items_can_be_removed_only_by_trip_travelers(self):
+        trip = self.create_trip('Kyoto', 'Japan')
+        mandatory = trip.checklist_items.filter(is_mandatory=True).first()
+        self.assertEqual(self.client.post(reverse('checklist_remove', args=[mandatory.pk])).status_code, 404)
+        custom = trip.checklist_items.create(title='Camera', is_custom=True)
+        url = reverse('checklist_remove', args=[custom.pk])
+        self.client.force_login(User.objects.create_user('outsider'))
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.client.force_login(self.owner)
+        self.assertEqual(self.client.get(url).status_code, 405)
+        for item in [custom, trip.checklist_items.filter(is_custom=False, is_mandatory=False).first()]:
+            self.assertRedirects(self.client.post(reverse('checklist_remove', args=[item.pk])),
+                                 reverse('trip_detail', args=[trip.pk]) + '#preparation', fetch_redirect_response=False)
+            self.assertFalse(trip.checklist_items.filter(pk=item.pk).exists())
+        self.assertTrue(trip.checklist_items.filter(pk=mandatory.pk).exists())
+
+    def test_named_places_do_not_repeat_across_days(self):
+        trip = self.create_trip('Kyoto', 'Japan')
+        from .models import Activity
+        activities = Activity.objects.filter(day__trip=trip)
+        locations = list(activities.values_list('location', flat=True))
+        self.assertEqual(len(locations), len(set(locations)))
+        self.assertEqual(activities.filter(title__icontains='Nishiki').count(), 1)
+        self.assertEqual(trip.itinerary_days.count(), 15)
+        self.assertTrue(trip.itinerary_days.filter(activities__isnull=True).exists())
+
+    def test_country_suggestions_are_used_once(self):
+        trip = self.create_trip('Osaka', 'Japan')
+        from .models import Activity
+        titles = list(Activity.objects.filter(day__trip=trip).values_list('title', flat=True))
+        self.assertEqual(len(titles), 4)
+        self.assertEqual(len(titles), len(set(titles)))
+
+    def test_join_from_my_trips_with_code(self):
+        from .models import GroupTrip, RemovedMember
+
+        trip = self.create_trip('Kyoto', 'Japan')
+        group = GroupTrip.objects.create(trip=trip, created_by=self.owner)
+        guest = User.objects.create_user('guest')
+        self.client.force_login(guest)
+        listing = reverse('trip_list')
+        invite = reverse('trip_join', args=[group.invite_code])
+        self.assertContains(self.client.post(listing, {'invite_code': 'unknown'}), 'Trip code not found')
+        self.assertRedirects(self.client.post(listing, {'invite_code': ' ' + group.invite_code.lower() + ' '}), invite)
+        self.assertFalse(group.members.filter(user=guest).exists())
+        self.assertRedirects(self.client.post(invite), reverse('trip_detail', args=[trip.pk]))
+        self.assertContains(self.client.get(listing), trip.destination)
+        group.members.filter(user=guest).delete()
+        RemovedMember.objects.create(group_trip=group, user=guest)
+        self.assertRedirects(self.client.post(invite), listing)
+        self.assertFalse(group.members.filter(user=guest).exists())

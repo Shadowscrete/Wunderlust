@@ -126,3 +126,22 @@ a { color: inherit; }
     .hero h1 { font-size: 52px; }
     .hero-caption { left: 52px; right: 18px; justify-content: flex-end; }
 }
+
+.quick-guide {
+    width: min(88%, 1200px);
+    margin: 0 auto;
+    padding-top: clamp(3rem, 7vw, 6rem);
+    scroll-margin-top: 5rem;
+}
+.quick-guide h2 { font: 500 clamp(2rem, 4vw, 3.5rem)/1.12 "Playfair Display", serif; }
+.quick-guide ol {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 1.5rem 3rem;
+    padding-left: 1.5rem;
+    margin: 2rem 0 0;
+    list-style: decimal outside;
+}
+.quick-guide li { padding-left: .35rem; }
+.quick-guide li::marker { font-weight: 700; }
+.quick-guide li p { margin: .5rem 0 0; line-height: 1.6; }

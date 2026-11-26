@@ -13,12 +13,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'home/home.css' %}?v=4">
 </head>
 <body class="wunderlust-page">
     <header class="site-header">
         <a class="brand" href="{% url 'home' %}" aria-label="Wunderlust home">Wunderlust</a>
         <nav class="main-nav" aria-label="Main navigation">
+            <a href="#quick-guide">Quick guide</a>
             <a href="#discover">Discover</a>
             <a href="#inspiration">Inspiration</a>
             <a href="#about">Our approach</a>
@@ -26,6 +27,7 @@
         <div class="account-nav"><a class="login-link" href="{% url 'login' %}">Log in</a><a class="signup-link" href="{% url 'register' %}">Join Wunderlust <span aria-hidden="true">&#8599;&#xFE0E;</span></a></div>
         <button class="mobile-menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-navigation"><span></span><span></span></button>
         <nav class="mobile-navigation" id="mobile-navigation" aria-label="Mobile navigation">
+            <a href="#quick-guide">Quick guide</a>
             <a href="#discover">Discover</a><a href="#inspiration">Inspiration</a><a href="#about">Our approach</a><a href="{% url 'login' %}">Log in</a><a href="{% url 'register' %}">Join Wunderlust</a>
         </nav>
     </header>
@@ -42,6 +44,15 @@
             </div>
             <div class="hero-caption"><span class="caption-rule"></span> LAKE BRAIES, DOLOMITES <span class="caption-coordinates">46°41′N&nbsp; 12°05′E</span></div>
             <a class="scroll-cue" href="#discover" aria-label="Scroll to discover travel inspiration"><span></span></a>
+        </section>
+
+        <section class="quick-guide" id="quick-guide" aria-labelledby="guide-title">
+            <h2 id="guide-title">How to plan your first trip</h2>
+            <ol>
+                <li><strong>Create your trip</strong><p>Sign in, start a new trip, and enter your destination and travel dates.</p></li>
+                <li><strong>Plan each day</strong><p>Open your itinerary and add activities to the days you want. Leave the time open if you prefer to decide later.</p></li>
+                <li><strong>Get ready to go</strong><p>Use your preparation checklist to track what’s ready. Traveling with friends? Create a trip invite and share the link.</p></li>
+            </ol>
         </section>
 
         <section class="discover-section" id="discover" aria-labelledby="discover-title">

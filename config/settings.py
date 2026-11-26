@@ -288,7 +288,8 @@ SECURE_CSP = {
     'script-src': [CSP.SELF, CSP.NONCE],
     'style-src': [CSP.SELF, CSP.UNSAFE_INLINE, 'https://fonts.googleapis.com'],
     'font-src': [CSP.SELF, 'https://fonts.gstatic.com'],
-    'img-src': [CSP.SELF, 'data:', 'blob:', 'https://*.supabase.co'],
+    # Supabase: profile pictures. Wikimedia: destination photos on the Trends page.
+    'img-src': [CSP.SELF, 'data:', 'blob:', 'https://*.supabase.co', 'https://*.wikimedia.org'],
     'connect-src': [CSP.SELF],
     'manifest-src': [CSP.SELF],
     'worker-src': [CSP.SELF],

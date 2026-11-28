@@ -15,7 +15,7 @@ from accounts.context_processors import get_user_prefs
 from accounts.models import Profile
 
 from .decorators import role_required
-from .forms import ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
+from .forms import ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
@@ -429,6 +429,14 @@ def trip_detail(request, trip_id):
                 activity.delete()
                 _notify_group(trip, 'Itinerary updated', f'{request.user.username} removed {activity.title} from the itinerary.', request.user.pk)
             return redirect('trip_detail', trip_id=trip.pk)
+        elif action == 'edit_itinerary_day':
+            day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
+            form = ItineraryDayEditForm(request.POST, instance=day, prefix=f'day-{day.pk}')
+            if form.is_valid():
+                form.save(commit=False).save(update_fields=['title', 'notes'])
+                _notify_group(trip, 'Itinerary updated', f'{request.user.username} edited the itinerary day for {day.date:%b %d}.', request.user.pk)
+                return redirect('trip_detail', trip_id=trip.pk)
+            bound_edit = form
         elif action == 'delete_itinerary_day':
             day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
             with transaction.atomic():
@@ -445,6 +453,8 @@ def trip_detail(request, trip_id):
                 return redirect('trip_detail', trip_id=trip.pk)
     days = trip.itinerary_days.prefetch_related('activities').all()
     for day in days:
+        prefix = f'day-{day.pk}'
+        day.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ItineraryDayEditForm(instance=day, prefix=prefix)
         for activity in day.activities.all():
             prefix = f'activity-{activity.pk}'
             activity.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ActivityForm(instance=activity, prefix=prefix)

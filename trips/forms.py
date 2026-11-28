@@ -162,6 +162,11 @@ class ItineraryDayForm(forms.ModelForm):
         return selected_date
 
 
+class ItineraryDayEditForm(forms.ModelForm):
+    class Meta(ItineraryDayForm.Meta):
+        fields = ('title', 'notes')
+
+
 class TravelInfoForm(forms.ModelForm):
     category = forms.ChoiceField(choices=NOTE_CATEGORY_CHOICES, initial=TravelInfo.Category.TRANSIT)
 

@@ -113,6 +113,17 @@ class AdminPanelTests(TestCase):
         self.assertFalse(Activity.objects.filter(pk=activity.pk).exists())
         self.assertTrue(Notification.objects.filter(user=self.alice, title='Itinerary updated').exists())
 
+    def test_edit_day_keeps_original_date(self):
+        day = self.trip.itinerary_days.create(date=self.trip.start_date)
+        self.login(self.alice)
+        url = reverse('trip_detail', args=[self.trip.pk])
+        response = self.client.post(url, {'action': 'edit_itinerary_day', 'day_id': day.pk,
+                                          f'day-{day.pk}-title': 'Arrival', f'day-{day.pk}-notes': 'Pack light',
+                                          f'day-{day.pk}-date': self.trip.end_date})
+        self.assertEqual(response.status_code, 302)
+        day.refresh_from_db()
+        self.assertEqual((day.title, day.notes, day.date), ('Arrival', 'Pack light', self.trip.start_date))
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

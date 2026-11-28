@@ -105,7 +105,7 @@ def _is_read(item):
     return item.is_read if item.user_id else item.seen
 
 
-def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_updates'):
+def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_updates', *, retain_after_delete=False):
     group = getattr(trip, 'group_trip', None)
     recipients = set()
     if trip.owner_id != exclude_user:
@@ -116,7 +116,7 @@ def _notify_group(trip, title, message, exclude_user=None, kind='notify_trip_upd
     if recipients:
         recipients -= set(Profile.objects.filter(user_id__in=recipients, **{kind: False}).values_list('user_id', flat=True))
     Notification.objects.bulk_create([
-        Notification(user_id=user_id, trip=trip, title=title, message=message)
+        Notification(user_id=user_id, trip=None if retain_after_delete else trip, title=title, message=message)
         for user_id in recipients
     ])
 

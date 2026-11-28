@@ -109,6 +109,17 @@ class AdminPanelTests(TestCase):
         self.client.post(reverse('checklist_remove', args=[item.pk]))
         self.assertTrue(Notification.objects.filter(user=self.alice, message='bob removed Camera from the checklist.').exists())
 
+    def test_admin_trip_notices_reach_members(self):
+        from .models import GroupTrip
+
+        GroupTrip.objects.create(trip=self.trip, created_by=self.alice).members.create(user=self.bob)
+        self.login(self.admin)
+        url = reverse('admin_trip_action', args=[self.trip.pk])
+        for action in ('cancel', 'delete'):
+            self.client.post(url, {'action': action})
+            notices = Notification.objects.filter(trip=self.trip if action == 'cancel' else None)
+            self.assertCountEqual(notices.values_list('user_id', flat=True), [self.alice.pk, self.bob.pk])
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

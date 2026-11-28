@@ -24,6 +24,7 @@ from accounts.models import Report, UserSession
 from accounts.sessions import end_session
 from accounts.social import avatar_url_for, initials_for
 
+from .views import _notify_group
 from .decorators import role_required
 from .forms import SystemNotificationForm, TravelInfoForm
 from .models import Checklist, Flight, GroupMember, Notification, TravelInfo, Trip
@@ -281,18 +282,20 @@ def admin_trip_action(request, trip_id):
     trip = get_object_or_404(Trip, pk=trip_id)
     action = request.POST.get('action')
     if action == 'cancel' and trip.status != Trip.Status.CANCELLED:
-        trip.status = Trip.Status.CANCELLED
-        trip.save(update_fields=['status', 'updated_at'])
-        Notification.objects.create(user=trip.owner, trip=trip, title=f'Your trip to {trip.destination} was cancelled',
-                                    message='The Wunderlust team cancelled this trip. Contact support if you think this is a mistake.')
-        messages.success(request, f'Trip to {trip.destination} cancelled; the owner was notified.')
-    elif action == 'delete':
-        owner, destination = trip.owner, trip.destination
         with transaction.atomic():
+            trip.status = Trip.Status.CANCELLED
+            trip.save(update_fields=['status', 'updated_at'])
+            _notify_group(trip, f'Your trip to {trip.destination} was cancelled',
+                          'The Wunderlust team cancelled this trip. Contact support if you think this is a mistake.')
+        messages.success(request, f'Trip to {trip.destination} cancelled.')
+    elif action == 'delete':
+        destination = trip.destination
+        with transaction.atomic():
+            _notify_group(trip, f'Your trip to {destination} was removed',
+                          'The Wunderlust team removed this trip. Contact support if you think this is a mistake.',
+                          retain_after_delete=True)
             trip.delete()
-            Notification.objects.create(user=owner, title=f'Your trip to {destination} was removed',
-                                        message='The Wunderlust team removed this trip. Contact support if you think this is a mistake.')
-        messages.success(request, f'Trip to {destination} deleted; the owner was notified.')
+        messages.success(request, f'Trip to {destination} deleted.')
         invalidate_analytics()
         return redirect('admin_trips')
     invalidate_analytics()

@@ -565,3 +565,21 @@ class ExpenseModelTests(TestCase):
         self.assertEqual(self.client.post(url, dict(data, currency='NOK')).status_code, 302)
         trip.refresh_from_db()
         self.assertEqual(trip.currency, 'NOK')
+
+
+class ExchangeRateTests(TestCase):
+    def test_currency_and_rate_requests_are_cached_and_same_currency_is_offline(self):
+        from decimal import Decimal
+        from io import BytesIO
+        from unittest.mock import patch
+
+        from .fx import exchange_rate, supported_currencies
+
+        cache.clear()
+        with patch('trips.fx.urlopen', side_effect=[BytesIO(b'{"USD":"US Dollar"}'), BytesIO(b'{"rates":{"USD":1.25}}')]) as fetch:
+            for _ in range(2):
+                self.assertIn('USD', supported_currencies())
+                self.assertEqual(exchange_rate('EUR', 'USD'), Decimal('1.25'))
+                self.assertEqual(exchange_rate('USD', 'USD'), 1)
+            self.assertEqual(fetch.call_count, 2)
+            self.assertEqual(fetch.call_args.kwargs['timeout'], 5)

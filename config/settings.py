@@ -327,3 +327,5 @@ if len(sys.argv) > 1 and sys.argv[1] == 'test':
     PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
     SESSION_ENGINE = 'django.contrib.sessions.backends.db'
     STORAGES['default'] = {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
+
+FX_API_BASE_URL = os.environ.get("FX_API_BASE_URL", "https://api.frankfurter.dev/v1")

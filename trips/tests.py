@@ -154,6 +154,35 @@ class AdminPanelTests(TestCase):
         self.assertFalse(self.trip.travel_info.exists())
         self.assertTrue(Notification.objects.filter(user=self.alice, message__contains='removed Metro').exists())
 
+    def test_invite_reset_retries_and_sharing_off_requires_no_other_members(self):
+        from unittest.mock import patch
+
+        from .models import GroupTrip
+
+        group = GroupTrip.objects.create(trip=self.trip, created_by=self.alice)
+        group.members.create(user=self.alice, membership='ORGANIZER')
+        member = group.members.create(user=self.bob)
+        other_trip = Trip.objects.create(owner=self.bob, destination='Oslo', start_date=self.trip.start_date, end_date=self.trip.end_date)
+        collision = GroupTrip.objects.create(trip=other_trip, created_by=self.bob)
+        old_code = group.invite_code
+        url = reverse('trip_invite_reset', args=[self.trip.pk])
+        self.login(self.bob)
+        self.assertEqual(self.client.post(url).status_code, 404)
+        self.login(self.alice)
+        with patch('trips.views.create_trip_code', side_effect=[collision.invite_code, 'NEWCODE123']):
+            self.assertEqual(self.client.post(url).status_code, 302)
+        group.refresh_from_db()
+        self.assertEqual(group.invite_code, 'NEWCODE123')
+        self.assertEqual(self.client.get(reverse('trip_join', args=[old_code])).status_code, 404)
+        self.client.post(url, {'action': 'off'})
+        self.assertTrue(GroupTrip.objects.filter(pk=group.pk).exists())
+        self.login(self.bob)
+        self.assertEqual(self.client.get(reverse('trip_detail', args=[self.trip.pk])).status_code, 200)
+        member.delete()
+        self.login(self.alice)
+        self.client.post(url, {'action': 'off'})
+        self.assertFalse(GroupTrip.objects.filter(pk=group.pk).exists())
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

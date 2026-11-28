@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from accounts.security import rate_limited
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,7 +21,7 @@ from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, Gr
 from .trends import CITIES, destination_trends
 from .recommendations import ideas_for
 from .flight_status import FlightLookupLimited, FlightStatusError, get_flight_status, is_trackable
-from .models import refresh_ready_status, trip_readiness
+from .models import create_trip_code, refresh_ready_status, trip_readiness
 from accounts.social import avatar_url_for, initials_for
 
 User = get_user_model()
@@ -592,6 +592,39 @@ def trip_invite(request, trip_id):
 
 @role_required(User.Role.TRAVELER)
 @require_POST
+def trip_invite_reset(request, trip_id):
+    trip = _owned_trip(request, trip_id)
+    with transaction.atomic():
+        group = get_object_or_404(GroupTrip.objects.select_for_update(), trip=trip)
+        if request.POST.get('action') == 'off':
+            if group.members.exclude(user=request.user).exists():
+                messages.error(request, 'Remove the other members before turning group sharing off.')
+            else:
+                group.delete()
+                messages.success(request, 'Group sharing is off.')
+        else:
+            previous_code = group.invite_code
+            for _ in range(10):
+                code = create_trip_code()
+                if code == previous_code:
+                    continue
+                try:
+                    with transaction.atomic():
+                        group.invite_code = code
+                        group.save(update_fields=['invite_code'])
+                except IntegrityError:
+                    if not GroupTrip.objects.filter(invite_code=code).exists():
+                        raise
+                else:
+                    messages.success(request, 'Invite code reset.')
+                    break
+            else:
+                messages.error(request, 'Could not reset the invite code. Please try again.')
+    return redirect('trip_detail', trip_id=trip.pk)
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
 def trip_leave(request, trip_id):
     trip = get_object_or_404(_accessible_trips(request.user), pk=trip_id)
     if trip.owner_id == request.user.pk:
@@ -630,8 +663,12 @@ def trip_remove_member(request, trip_id, user_id):
 
 
 @role_required(User.Role.TRAVELER)
+@transaction.atomic
 def trip_join(request, invite_code):
-    group_trip = get_object_or_404(GroupTrip.objects.select_related('trip', 'created_by'), invite_code=invite_code)
+    groups = GroupTrip.objects.select_related('trip', 'created_by')
+    if request.method == 'POST':
+        groups = groups.select_for_update(of=('self',))
+    group_trip = get_object_or_404(groups, invite_code=invite_code)
     if group_trip.trip.owner_id != request.user.pk and RemovedMember.objects.filter(group_trip=group_trip, user=request.user).exists():
         messages.error(request, 'The organizer removed you from this trip, so you can’t rejoin with this link.')
         return redirect('trip_list')

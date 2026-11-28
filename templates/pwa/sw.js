@@ -21,7 +21,7 @@ const isCacheablePage = (url) =>
   !url.pathname.startsWith('/dashboard/admin/') &&
   !url.pathname.startsWith('/dashboard/notifications/') &&
   !url.pathname.startsWith('/dashboard/join/') &&
-  !/\/(status|toggle|quantity|delete|leave|remove|invite|read)\/?$/.test(url.pathname);
+  !/\/(status|toggle|quantity|delete|leave|remove|invite|reset|read)\/?$/.test(url.pathname);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

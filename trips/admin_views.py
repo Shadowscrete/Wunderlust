@@ -25,6 +25,7 @@ from accounts.sessions import end_session
 from accounts.social import avatar_url_for, initials_for
 
 from .views import _notify_group
+from .airline_marks import airline_mark
 from .decorators import role_required
 from .forms import SystemNotificationForm, TravelInfoForm
 from .models import ChecklistCheck, Flight, GroupMember, Notification, TravelInfo, Trip
@@ -272,11 +273,14 @@ def admin_trips(request):
 def admin_trip_detail(request, trip_id):
     trip = get_object_or_404(Trip.objects.select_related('owner'), pk=trip_id)
     members = GroupMember.objects.filter(group_trip__trip=trip).select_related('user') if trip.is_group_trip else []
+    flights = list(trip.flights.order_by('flight_date'))
+    for flight in flights:
+        flight.mark = airline_mark(flight.carrier_code, flight.airline_name)
     return render(request, 'dashboard/admin/trip_detail.html', {
         'trip': trip,
         'members': members,
         'days': trip.itinerary_days.prefetch_related('activities').order_by('date'),
-        'flights': Flight.objects.filter(trip=trip).order_by('flight_date'),
+        'flights': flights,
         'checklist': trip.checklist_items.aggregate(total=Count('pk'), done=Count('pk', filter=Q(checks__user=trip.owner), distinct=True)),
     })
 

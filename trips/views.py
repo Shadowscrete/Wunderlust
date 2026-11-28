@@ -16,6 +16,7 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ChecklistRenameForm, ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
+from .airline_marks import airline_mark
 from .balances import ZERO, suggested_transfers, trip_balances
 from .expense_forms import ExpenseForm
 from .models import NotificationRead
@@ -500,6 +501,8 @@ def trip_detail(request, trip_id):
         row['expense_balance'] = balances.get(row['user'].pk, ZERO)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
+    for flight in flights:
+        flight.mark = airline_mark(flight.carrier_code, flight.airline_name)
     travel_info = list(trip.travel_info.exclude(category=TravelInfo.Category.FLIGHT))
     for info in travel_info:
         prefix = f'note-{info.pk}'

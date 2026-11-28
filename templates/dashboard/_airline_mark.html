@@ -1,0 +1,5 @@
+{% if mark.logo_url %}
+<span class="airline-mark airline-mark--logo"><img src="{{ mark.logo_url }}" alt="" width="40" height="40" loading="lazy" decoding="async"></span>
+{% else %}
+<span class="airline-mark airline-mark--c{{ mark.colour }}" aria-hidden="true">{{ mark.code }}</span>
+{% endif %}

@@ -27,8 +27,8 @@
         {% include 'dashboard/_travelers.html' with where='overview' %}
         <section class="dashboard-section detail-section overview-flights"><div class="section-heading"><div><p class="eyebrow">IN THE AIR</p><h2>Flights</h2></div><a class="text-button" href="#travel-info">{% if flights %}Manage{% else %}Add flight{% endif %}</a></div>
             {% for flight in flights %}<div class="overview-flight">
-                <span class="flight-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span>
-                <div class="overview-flight-main"><strong class="flight-number">{{ flight.carrier_code }} {{ flight.number }}</strong><small>{% if flight.airline_name %}{{ flight.airline_name }}{% else %}Airline code {{ flight.carrier_code }}{% endif %}</small></div>
+                {% include "dashboard/_airline_mark.html" with mark=flight.mark only %}
+                <div class="overview-flight-main"><strong class="flight-number">{{ flight.carrier_code }} {{ flight.number }}</strong><small>{{ flight.mark.label }}</small></div>
                 <div class="overview-flight-when"><span class="flight-leg">{{ flight.get_leg_display }}</span><small>{{ flight.flight_date|date:"D, M j" }}</small></div>
             </div>{% empty %}<div class="overview-flight overview-flight-empty">
                 <span class="flight-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span>
@@ -54,8 +54,8 @@
 <div class="trip-info-panel">
             <section class="dashboard-section detail-section flights-section" id="flights"><div class="section-heading"><div><p class="eyebrow">IN THE AIR</p><h2>Flights</h2></div>{% if flights %}<span class="count-badge">{{ flights|length }}</span>{% endif %}</div>
                 {% for flight in flights %}<article class="flight-row">
-                    <span class="flight-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg></span>
-                    <div class="flight-main"><strong class="flight-number">{{ flight.carrier_code }} {{ flight.number }}</strong><small>{% if flight.airline_name %}{{ flight.airline_name }}{% else %}Airline code {{ flight.carrier_code }}{% endif %}</small></div>
+                    {% include "dashboard/_airline_mark.html" with mark=flight.mark only %}
+                    <div class="flight-main"><strong class="flight-number">{{ flight.carrier_code }} {{ flight.number }}</strong><small>{{ flight.mark.label }}</small></div>
                     <div class="flight-when"><span class="flight-leg">{{ flight.get_leg_display }}</span><small>{{ flight.flight_date|date:"D, M j, Y" }}</small></div>
                     <div class="flight-live" data-flight-status-url="{% url 'flight_status' trip.pk flight.pk %}" aria-live="polite"><button type="button" class="text-button flight-live-check">Refresh status</button><small class="flight-live-msg">Flight status pending</small></div>
                     <form method="post" class="flight-remove">{% csrf_token %}<input type="hidden" name="action" value="delete_flight"><input type="hidden" name="flight_id" value="{{ flight.pk }}"><button class="text-button" type="submit" aria-label="Remove flight {{ flight.flight_number }}">Remove</button></form>

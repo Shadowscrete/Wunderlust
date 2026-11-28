@@ -22,7 +22,7 @@
 
 <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">TRAVEL</p><h2>Flights</h2></div></div>
     <div class="table-wrap"><table><thead><tr><th>Flight</th><th>Airline</th><th>Date</th><th>Leg</th></tr></thead><tbody>
-    {% for flight in flights %}<tr><td><strong>{{ flight.flight_number }}</strong></td><td>{{ flight.airline_name|default:"—" }}</td><td>{{ flight.flight_date|date:"M j, Y" }}</td><td>{{ flight.get_leg_display }}</td></tr>{% empty %}<tr><td colspan="4" class="table-empty">No flights added.</td></tr>{% endfor %}</tbody></table></div></section>
+    {% for flight in flights %}<tr><td><strong>{{ flight.flight_number }}</strong></td><td><div class="airline-cell">{% include "dashboard/_airline_mark.html" with mark=flight.mark only %}{{ flight.mark.label }}</div></td><td>{{ flight.flight_date|date:"M j, Y" }}</td><td>{{ flight.get_leg_display }}</td></tr>{% empty %}<tr><td colspan="4" class="table-empty">No flights added.</td></tr>{% endfor %}</tbody></table></div></section>
 
 <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">PLAN</p><h2>Itinerary</h2></div></div>
     <div class="admin-entry-list">{% for day in days %}<article><span class="info-category">{{ day.date|date:"j" }}</span><div><strong>{{ day.title|default:"Day" }} · {{ day.date|date:"D, M j" }}</strong><small>{% for activity in day.activities.all %}{{ activity.title }}{% if not forloop.last %} · {% endif %}{% empty %}No activities{% endfor %}</small></div></article>{% empty %}<p class="empty-inline">No itinerary yet.</p>{% endfor %}</div></section>

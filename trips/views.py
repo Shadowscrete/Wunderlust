@@ -561,10 +561,6 @@ def trip_join(request, invite_code):
 @role_required(User.Role.TRAVELER)
 def activity_list(request):
     cutoff = timezone.localdate() - timedelta(days=30)
-    # Lazy cleanup keeps stale activities out even if the daily management command is not scheduled.
-    # cache.add only succeeds once per day, so the DELETE doesn't run on every page view.
-    if cache.add(f'activity-cleanup-{timezone.localdate()}', True, 60 * 60 * 24):
-        Activity.objects.filter(day__date__lt=cutoff).delete()
     kind = request.GET.get('type', 'all')
     if kind not in ('all', 'log', 'notification'):
         kind = 'all'

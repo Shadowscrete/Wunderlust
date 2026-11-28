@@ -136,6 +136,18 @@ class PreparationAndItineraryTests(TestCase):
         self.client.force_login(self.owner)
         self.start = timezone.localdate() + timedelta(days=1)
 
+    def test_past_itinerary_survives_activity_feed_and_cleanup(self):
+        from django.core.management import call_command
+
+        past = timezone.localdate() - timedelta(days=40)
+        trip = Trip.objects.create(owner=self.owner, destination='Kyoto', start_date=past, end_date=past)
+        day = trip.itinerary_days.create(date=past)
+        activity = day.activities.create(title='Historical walk')
+        cache.clear()
+        self.assertNotContains(self.client.get(reverse('activity_list')), activity.title)
+        call_command('cleanup_activities')
+        self.assertTrue(day.activities.filter(pk=activity.pk).exists())
+
     def create_trip(self, city, country):
         response = self.client.post(reverse('trip_create'), {
             'destination': city, 'country': country, 'start_date': self.start,

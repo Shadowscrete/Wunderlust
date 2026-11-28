@@ -429,6 +429,12 @@ def trip_detail(request, trip_id):
                 activity.delete()
                 _notify_group(trip, 'Itinerary updated', f'{request.user.username} removed {activity.title} from the itinerary.', request.user.pk)
             return redirect('trip_detail', trip_id=trip.pk)
+        elif action == 'delete_itinerary_day':
+            day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
+            with transaction.atomic():
+                day.delete()
+                _notify_group(trip, 'Itinerary updated', f'{request.user.username} removed the itinerary day for {day.date:%b %d}.', request.user.pk)
+            return redirect('trip_detail', trip_id=trip.pk)
         elif action == 'add_itinerary_day':
             itinerary_day_form = ItineraryDayForm(trip, request.POST)
             if itinerary_day_form.is_valid():

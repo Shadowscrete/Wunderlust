@@ -99,6 +99,20 @@ class AdminPanelTests(TestCase):
         self.assertFalse(activity.is_recommended)
         self.assertTrue(Notification.objects.filter(user=self.alice, title='Itinerary updated').exists())
 
+    def test_delete_itinerary_day_cascades_and_notifies(self):
+        from .models import Activity, GroupTrip
+
+        GroupTrip.objects.create(trip=self.trip, created_by=self.alice).members.create(user=self.bob)
+        day = self.trip.itinerary_days.create(date=self.trip.start_date)
+        activity = day.activities.create(title='Walk')
+        self.login(self.bob)
+        url = reverse('trip_detail', args=[self.trip.pk])
+        self.assertContains(self.client.get(url), 'Delete this day and its 1 activity?')
+        self.assertEqual(self.client.post(url, {'action': 'delete_itinerary_day', 'day_id': day.pk}).status_code, 302)
+        self.assertFalse(self.trip.itinerary_days.exists())
+        self.assertFalse(Activity.objects.filter(pk=activity.pk).exists())
+        self.assertTrue(Notification.objects.filter(user=self.alice, title='Itinerary updated').exists())
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

@@ -374,6 +374,20 @@ def trip_detail(request, trip_id):
             flight.delete()
             _notify_group(trip, 'Flight removed', f'{request.user.username} removed {flight.flight_number} from {trip.destination}.', request.user.pk)
             return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
+        elif action in ('edit_travel_info', 'delete_travel_info'):
+            info = get_object_or_404(trip.travel_info.exclude(category=TravelInfo.Category.FLIGHT), pk=_post_id(request, 'info_id'))
+            if action == 'delete_travel_info':
+                with transaction.atomic():
+                    info.delete()
+                    _notify_group(trip, 'Travel information updated', f'{request.user.username} removed {info.title} from the trip notes.', request.user.pk)
+                return redirect(f"{reverse('trip_detail', args=[trip.pk])}#travel-info")
+            form = TripTravelInfoForm(request.POST, instance=info, prefix=f'note-{info.pk}')
+            if form.is_valid():
+                form.save(commit=False).save(update_fields=['title', 'category', 'details', 'updated_at'])
+                _notify_group(trip, 'Travel information updated', f'{request.user.username} edited {info.title} in the trip notes.', request.user.pk)
+                return redirect(f"{reverse('trip_detail', args=[trip.pk])}#travel-info")
+            bound_edit = form
+            active_tab = 'travel-info'
         elif action == 'add_travel_info':
             travel_info_form = TripTravelInfoForm(request.POST, prefix='info')
             active_tab = 'travel-info'
@@ -476,6 +490,9 @@ def trip_detail(request, trip_id):
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
     travel_info = list(trip.travel_info.exclude(category=TravelInfo.Category.FLIGHT))
+    for info in travel_info:
+        prefix = f'note-{info.pk}'
+        info.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else TripTravelInfoForm(instance=info, prefix=prefix)
     return render(request, 'dashboard/trip_detail.html', {
         'trip': trip,
         'days': days,

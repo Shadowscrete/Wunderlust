@@ -137,6 +137,23 @@ class AdminPanelTests(TestCase):
         required.refresh_from_db()
         self.assertEqual((custom.title, required.title), ('New name', 'Passport'))
 
+    def test_member_can_edit_and_delete_trip_note(self):
+        from .models import GroupTrip
+
+        GroupTrip.objects.create(trip=self.trip, created_by=self.alice).members.create(user=self.bob)
+        note = self.trip.travel_info.create(title='Transit', details='Take the bus')
+        self.login(self.bob)
+        url = reverse('trip_detail', args=[self.trip.pk])
+        response = self.client.post(url, {'action': 'edit_travel_info', 'info_id': note.pk,
+                                          f'note-{note.pk}-title': 'Metro', f'note-{note.pk}-category': note.category,
+                                          f'note-{note.pk}-details': 'Take the train'})
+        self.assertEqual(response.status_code, 302)
+        note.refresh_from_db()
+        self.assertEqual(note.title, 'Metro')
+        self.client.post(url, {'action': 'delete_travel_info', 'info_id': note.pk})
+        self.assertFalse(self.trip.travel_info.exists())
+        self.assertTrue(Notification.objects.filter(user=self.alice, message__contains='removed Metro').exists())
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

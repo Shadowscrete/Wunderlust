@@ -15,6 +15,7 @@
     <button class="trip-tab" type="button" role="tab" id="tab-overview" aria-controls="panel-overview" data-tab="overview">Overview</button>
     <button class="trip-tab" type="button" role="tab" id="tab-preparation" aria-controls="panel-preparation" data-tab="preparation">Preparation <span class="trip-tab-count" data-prep-tab>{{ all_done }}/{{ all_count }}</span></button>
     <button class="trip-tab" type="button" role="tab" id="tab-travel-info" aria-controls="panel-travel-info" data-tab="travel-info">Travel information <span class="trip-tab-count">{{ travel_tab_count }}</span></button>
+    <button class="trip-tab" type="button" role="tab" id="tab-expenses" aria-controls="panel-expenses" data-tab="expenses">Expenses</button>
 </nav>
 <div class="trip-panel" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-panel="overview">
 <div class="trip-detail-grid">
@@ -48,6 +49,7 @@
         </section>
 </div>
 </div>
+{% include "dashboard/expenses.html" %}
 <div class="trip-panel" role="tabpanel" id="panel-travel-info" aria-labelledby="tab-travel-info" data-panel="travel-info">
 <div class="trip-info-panel">
             <section class="dashboard-section detail-section flights-section" id="flights"><div class="section-heading"><div><p class="eyebrow">IN THE AIR</p><h2>Flights</h2></div>{% if flights %}<span class="count-badge">{{ flights|length }}</span>{% endif %}</div>

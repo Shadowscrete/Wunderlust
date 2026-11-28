@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from accounts.security import rate_limited
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -16,7 +16,8 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ChecklistRenameForm, ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
-from .balances import ZERO, trip_balances
+from .balances import ZERO, suggested_transfers, trip_balances
+from .expense_forms import ExpenseForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
@@ -67,8 +68,12 @@ def traveler_dashboard(request):
     ).select_related('day__trip').order_by('day__date', 'start_time')[:6]
     group_memberships = GroupMember.objects.filter(user=request.user).select_related('group_trip__trip', 'group_trip__created_by')
     travel_info = TravelInfo.objects.filter(Q(trip__in=upcoming_trips) | Q(trip__isnull=True)).exclude(category=TravelInfo.Category.FLIGHT).distinct()[:8]
+    dashboard_trips = list(upcoming_trips[:5])
+    balances = trip_balances([trip.pk for trip in dashboard_trips], request.user.pk)
+    for trip in dashboard_trips:
+        trip.expense_balance = balances[trip.pk][request.user.pk]
     return render(request, 'dashboard/traveler.html', {
-        'trips': upcoming_trips[:5],
+        'trips': dashboard_trips,
         'has_any_trips': trips.exists(),
         'documents': documents,
         'packing_items': packing_items,
@@ -358,7 +363,7 @@ def trip_detail(request, trip_id):
     bound_edit = None
     itinerary_day_form = ItineraryDayForm(trip)
     flight_form = FlightForm(trip, prefix='flight')
-    active_tab = 'overview'
+    active_tab = 'expenses' if request.GET.get('tab') == 'expenses' else 'overview'
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_flight':
@@ -499,7 +504,36 @@ def trip_detail(request, trip_id):
     for info in travel_info:
         prefix = f'note-{info.pk}'
         info.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else TripTravelInfoForm(instance=info, prefix=prefix)
+    current = {row['user'].pk: row['user'].username for row in travelers}
+    former = User.objects.in_bulk(pk for pk in balances if pk is not None and pk not in current)
+
+    def traveler_label(pk):
+        if pk in current:
+            return current[pk]
+        if pk in former:
+            return f'{former[pk].username} (left)'
+        return 'Deleted traveler'
+
+    expense_page = Paginator(trip.expenses.select_related('paid_by'), 25).get_page(request.GET.get('expense_page'))
+    for expense in expense_page:
+        expense.payer_label = traveler_label(expense.paid_by_id)
+    transfers = [
+        {'sender': sender, 'recipient': recipient, 'sender_name': traveler_label(sender),
+         'recipient_name': traveler_label(recipient), 'amount': amount,
+         'can_record': sender is not None and recipient is not None and request.user.pk in (trip.owner_id, sender, recipient)}
+        for sender, recipient, amount in suggested_transfers(balances)
+    ]
+    settlements = list(trip.settlements.order_by('-created_at', '-pk'))
+    for settlement in settlements:
+        settlement.sender_label = traveler_label(settlement.from_user_id)
+        settlement.recipient_label = traveler_label(settlement.to_user_id)
     return render(request, 'dashboard/trip_detail.html', {
+        'expense_rows': [(traveler_label(pk), balances.get(pk, ZERO)) for pk in [*current, *(pk for pk in balances if pk not in current)]],
+        'expense_page': expense_page,
+        'expense_total': trip.expenses.aggregate(total=Sum('amount_in_trip_currency', default=ZERO))['total'],
+        'expense_form': ExpenseForm(trip, viewer=request.user, travelers=[(row['user'], row['role']) for row in travelers]),
+        'transfers': transfers,
+        'settlements': settlements,
         'trip': trip,
         'days': days,
         'documents': documents,

@@ -1,0 +1,67 @@
+{% load l10n %}
+<div class="trip-panel" role="tabpanel" id="panel-expenses" aria-labelledby="tab-expenses" data-panel="expenses">
+    <section class="dashboard-section detail-section">
+        <div class="section-heading"><h2>Expenses</h2><a class="button button-secondary" href="{% url 'expense_csv' trip.pk %}">Download CSV</a></div>
+        <p>Total spent <strong>{{ expense_total|floatformat:2 }} {{ trip.currency }}</strong></p>
+        <p>Your balance <strong>{{ expense_balance|floatformat:2 }} {{ trip.currency }}</strong></p>
+
+        <h3>Traveler balances</h3>
+        <ul>{% for name, balance in expense_rows %}<li>{{ name }} ? {{ balance|floatformat:2 }} {{ trip.currency }}</li>{% endfor %}</ul>
+
+        <h3>Who owes whom</h3>
+        {% for transfer in transfers %}
+            <p>{{ transfer.sender_name }} owes {{ transfer.recipient_name }} <strong>{{ transfer.amount|floatformat:2 }} {{ trip.currency }}</strong></p>
+            {% if transfer.can_record %}
+                <form method="post" action="{% url 'settlement_add' trip.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="from_user" value="{{ transfer.sender }}">
+                    <input type="hidden" name="to_user" value="{{ transfer.recipient }}">
+                    <input type="hidden" name="amount" value="{{ transfer.amount|unlocalize }}">
+                    <button class="button button-secondary button-small" type="submit">Mark as paid</button>
+                </form>
+            {% endif %}
+        {% empty %}<p class="empty-inline">Everyone is settled up.</p>{% endfor %}
+
+        {% if settlements %}
+        <h3>Payments recorded</h3>
+        {% for settlement in settlements %}
+            <p>{{ settlement.sender_label }} paid {{ settlement.recipient_label }} {{ settlement.amount|floatformat:2 }} {{ trip.currency }}</p>
+            {% if request.user.pk == trip.owner_id or request.user.pk == settlement.from_user_id or request.user.pk == settlement.to_user_id %}
+                <form method="post" action="{% url 'settlement_delete' trip.pk settlement.pk %}" data-confirm="Delete this settlement and update the balances?">
+                    {% csrf_token %}<button class="button button-danger-outline button-small" type="submit">Delete settlement</button>
+                </form>
+            {% endif %}
+        {% endfor %}
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section detail-section">
+        <h3>Expense history</h3>
+        {% for entry in expense_page %}
+            <article class="travel-info-entry">
+                <div><strong>{{ entry.title }}</strong> ? {{ entry.amount }} {{ entry.currency }}
+                    <p>{{ entry.payer_label }} ? {{ entry.spent_on }} ? {{ entry.amount_in_trip_currency }} {{ trip.currency }}</p>
+                    {% if entry.notes %}<p>{{ entry.notes|linebreaksbr }}</p>{% endif %}
+                </div>
+                {% if request.user.pk == trip.owner_id or request.user.pk == entry.paid_by_id %}
+                    <a class="button button-secondary button-small" href="{% url 'expense_edit' trip.pk entry.pk %}">Edit</a>
+                    <form method="post" action="{% url 'expense_delete' trip.pk entry.pk %}" data-confirm="Delete {{ entry.title }} from the expenses?">
+                        {% csrf_token %}<button class="button button-danger-outline button-small" type="submit">Delete</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% empty %}<p class="empty-inline">No expenses yet.</p>{% endfor %}
+        {% if expense_page.paginator.num_pages > 1 %}
+        <nav aria-label="Expense pages">
+            {% if expense_page.has_previous %}<a href="?tab=expenses&amp;expense_page={{ expense_page.previous_page_number }}#panel-expenses">Previous</a>{% endif %}
+            <span>Page {{ expense_page.number }} of {{ expense_page.paginator.num_pages }}</span>
+            {% if expense_page.has_next %}<a href="?tab=expenses&amp;expense_page={{ expense_page.next_page_number }}#panel-expenses">Next</a>{% endif %}
+        </nav>
+        {% endif %}
+    </section>
+
+    <section class="dashboard-section detail-section">
+        <h3>Add expense</h3>
+        {% include "dashboard/expense_fields.html" with form=expense_form %}
+    </section>
+</div>

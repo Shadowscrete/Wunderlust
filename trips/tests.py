@@ -560,7 +560,7 @@ class ExpenseModelTests(TestCase):
         self.assertEqual(trip.currency, 'USD')
         self.client.force_login(owner)
         url = reverse('trip_edit', args=[trip.pk])
-        data = {'destination': trip.destination, 'start_date': date, 'end_date': date, 'status': trip.status}
+        data = {'destination': trip.destination, 'country': 'Norway', 'start_date': date, 'end_date': date, 'status': trip.status}
         self.assertContains(self.client.post(url, dict(data, currency='12')), 'three-letter currency code')
         self.assertEqual(self.client.post(url, dict(data, currency='NOK')).status_code, 302)
         trip.refresh_from_db()
@@ -655,6 +655,7 @@ class ExpenseFlowTests(TestCase):
         self.client.post(url, dict(data, amount='0'))
         self.assertFalse(self.trip.settlements.exists())
         self.client.post(url, data)
+        self.client.post(url, data)
         settlement = self.trip.settlements.get()
         self.assertEqual(trip_balances([self.trip.pk])[self.trip.pk][self.member.pk], 0)
         self.client.post(reverse('trip_leave', args=[self.trip.pk]))
@@ -662,3 +663,25 @@ class ExpenseFlowTests(TestCase):
         self.client.force_login(self.owner)
         self.client.post(reverse('settlement_delete', args=[self.trip.pk, settlement.pk]))
         self.assertEqual(trip_balances([self.trip.pk])[self.trip.pk][self.member.pk], -5)
+
+
+    def test_expenses_tab_pagination_dashboard_and_csv(self):
+        self.client.force_login(self.member)
+        add = reverse('expense_add', args=[self.trip.pk])
+        self.client.post(add, dict(self.data, title='=Formula'))
+        original = self.trip.expenses.get()
+        original.pk = None
+        for index in range(25):
+            original.pk = None
+            original.title = f'Expense {index}'
+            original.save()
+        detail = reverse('trip_detail', args=[self.trip.pk])
+        first = self.client.get(detail + '?tab=expenses')
+        self.assertEqual(len(first.context['expense_page']), 25)
+        self.assertNotContains(first, '=Formula')
+        self.assertContains(self.client.get(detail + '?tab=expenses&expense_page=2'), '=Formula')
+        self.assertContains(self.client.get(reverse('traveler_dashboard')), '-5.00 USD')
+        export = reverse('expense_csv', args=[self.trip.pk])
+        self.assertContains(self.client.get(export), "'=Formula")
+        self.client.force_login(self.outsider)
+        self.assertEqual(self.client.get(export).status_code, 404)

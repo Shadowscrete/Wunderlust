@@ -23,7 +23,7 @@ class ExpenseForm(forms.ModelForm):
     def __init__(self, trip, *args, viewer, travelers=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.trip = trip
-        people = dict((user.pk, user) for user, _ in (trip_travelers(trip) if travelers is None else travelers))
+        people = {user.pk: user for user, _ in (trip_travelers(trip) if travelers is None else travelers)}
         shares = list(self.instance.shares.select_related('user')) if self.instance.pk else []
         for user in [self.instance.paid_by, *(share.user for share in shares)]:
             if user:
@@ -32,6 +32,7 @@ class ExpenseForm(forms.ModelForm):
             label='Paid by', choices=[(pk, user.username) for pk, user in people.items()], coerce=int,
         )
         self.fields['travelers'].choices = self.fields['paid_by'].choices
+        self.fields['currency'].help_text = 'Enter a three-letter currency code, such as USD or EUR.'
         self.initial.update({'paid_by': self.instance.paid_by_id or viewer.pk,
                              'spent_on': self.instance.spent_on or timezone.localdate(),
                              'currency': self.instance.currency or trip.currency,

@@ -42,7 +42,7 @@ class FlightStatusError(Exception):
 
 
 def is_trackable(flight, today=None):
-    today = today or date.today()
+    today = today or timezone.localdate()
     return abs(flight.flight_date - today) <= LIVE_WINDOW
 
 
@@ -86,7 +86,11 @@ def _summarise(record):
     }
 
 
-def get_flight_status(flight):
+class FlightLookupLimited(FlightStatusError):
+    pass
+
+
+def get_flight_status(flight, *, rate_limit=None):
     """Return a status dict for a trips.Flight, or None if no matching flight was found."""
     api_key = getattr(settings, 'FLIGHT_API_KEY', '')
     if not api_key:
@@ -96,6 +100,9 @@ def get_flight_status(flight):
     cached = cache.get(cache_key)
     if cached is not None:
         return cached or None  # {} caches "not found"
+
+    if rate_limit and rate_limit():
+        raise FlightLookupLimited('You have used your 20 live flight checks for today. Try again tomorrow.')
 
     month_key = f'flight-status-usage:{date.today():%Y-%m}'
     limit = int(getattr(settings, 'FLIGHT_API_MONTHLY_LIMIT', DEFAULT_MONTHLY_LIMIT))

@@ -2,7 +2,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import datetime, time, timedelta
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
+from accounts.security import rate_limited
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
@@ -20,7 +20,7 @@ from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
 from .recommendations import ideas_for
-from .flight_status import FlightStatusError, get_flight_status, is_trackable
+from .flight_status import FlightLookupLimited, FlightStatusError, get_flight_status, is_trackable
 from .models import refresh_ready_status, trip_readiness
 from accounts.social import avatar_url_for, initials_for
 
@@ -333,7 +333,9 @@ def flight_status(request, trip_id, flight_id):
     if not is_trackable(flight):
         return JsonResponse({'ok': True, 'tracked': False, 'message': 'Live status is available around the day of the flight.'})
     try:
-        status = get_flight_status(flight)
+        status = get_flight_status(flight, rate_limit=lambda: rate_limited(request, 'flight-status', limit=20, window=86400))
+    except FlightLookupLimited as exc:
+        return JsonResponse({'ok': False, 'message': str(exc)}, status=429)
     except FlightStatusError as exc:
         return JsonResponse({'ok': False, 'message': str(exc)}, status=502)
     if status is None:
@@ -349,7 +351,7 @@ def trip_detail(request, trip_id):
     essentials = checklist.filter(is_document=False)
     travel_info_form = TripTravelInfoForm(prefix='info')
     checklist_form = CustomChecklistForm(prefix='item')
-    activity_form = ActivityForm()
+    submitted_day_id = None
     itinerary_day_form = ItineraryDayForm(trip)
     flight_form = FlightForm(trip, prefix='flight')
     active_tab = 'overview'
@@ -396,7 +398,8 @@ def trip_detail(request, trip_id):
                 return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#preparation")
         elif action == 'add_activity':
             day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
-            activity_form = ActivityForm(request.POST)
+            submitted_day_id = day.pk
+            activity_form = ActivityForm(request.POST, auto_id=f'id_day{day.pk}_%s')
             if activity_form.is_valid():
                 activity = activity_form.save(commit=False)
                 activity.day = day
@@ -424,6 +427,8 @@ def trip_detail(request, trip_id):
                 messages.success(request, 'Itinerary day added.')
                 return redirect('trip_detail', trip_id=trip.pk)
     days = trip.itinerary_days.prefetch_related('activities').all()
+    for day in days:
+        day.activity_form = activity_form if day.pk == submitted_day_id else ActivityForm(auto_id=f'id_day{day.pk}_%s')
     travelers = _readiness_rows(trip, request.user)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
@@ -442,7 +447,6 @@ def trip_detail(request, trip_id):
         'travel_tab_count': len(flights) + len(travel_info),
         'flight_form': flight_form,
         'checklist_form': checklist_form,
-        'activity_form': activity_form,
         'itinerary_day_form': itinerary_day_form,
         'group_trip': group_trip,
         'active_tab': active_tab,

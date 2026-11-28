@@ -13,7 +13,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, F, Q
+from django.db.models import Count, Exists, F, OuterRef, Q, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -27,7 +27,7 @@ from accounts.social import avatar_url_for, initials_for
 from .views import _notify_group
 from .decorators import role_required
 from .forms import SystemNotificationForm, TravelInfoForm
-from .models import Checklist, Flight, GroupMember, Notification, TravelInfo, Trip
+from .models import ChecklistCheck, Flight, GroupMember, Notification, TravelInfo, Trip
 
 User = get_user_model()
 ADMIN = User.Role.ADMINISTRATOR
@@ -107,8 +107,13 @@ def _analytics():
         active=Count('pk', filter=Q(status__in=(Trip.Status.PLANNING, Trip.Status.READY, Trip.Status.IN_PROGRESS))),
         group=Count('pk', filter=Q(group_trip__isnull=False)),
     )
-    checklist = Checklist.objects.aggregate(total=Count('pk', distinct=True),
-                                            complete=Count('pk', distinct=True, filter=Q(checks__user=F('trip__owner'))))
+    member_ticks = GroupMember.objects.filter(group_trip__trip_id=OuterRef('item__trip_id'), user_id=OuterRef('user_id'))
+    done = ChecklistCheck.objects.filter(Q(user_id=F('item__trip__owner_id')) | Exists(member_ticks)).count()
+    trips = Trip.objects.annotate(
+        items=Count('checklist_items', distinct=True),
+        others=Count('group_trip__members', distinct=True, filter=~Q(group_trip__members__user_id=F('owner_id'))),
+    )
+    total = trips.aggregate(total=Sum(F('items') * (F('others') + 1)))['total']
     status_labels = dict(Trip.Status.choices)
     status_rows = [{'label': status_labels.get(r['status'], r['status']), 'total': r['total']}
                    for r in Trip.objects.values('status').annotate(total=Count('pk')).order_by('-total')]
@@ -120,7 +125,7 @@ def _analytics():
     data = {
         'users': user_counts,
         'trips': trip_counts,
-        'completion_rate': round(checklist['complete'] * 100 / checklist['total']) if checklist['total'] else 0,
+        'completion_rate': round(done * 100 / total) if total else 0,
         'open_reports': Report.objects.filter(status=Report.Status.OPEN).count(),
         'signups': _monthly_series(User.objects.all(), 'date_joined', starts),
         'trips_created': _monthly_series(Trip.objects.all(), 'created_at', starts),

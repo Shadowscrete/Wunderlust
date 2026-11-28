@@ -120,6 +120,40 @@ class AdminPanelTests(TestCase):
             notices = Notification.objects.filter(trip=self.trip if action == 'cancel' else None)
             self.assertCountEqual(notices.values_list('user_id', flat=True), [self.alice.pk, self.bob.pk])
 
+    def test_completion_rate_counts_each_traveler(self):
+        from .admin_views import _analytics
+        from .models import ChecklistCheck, GroupTrip
+
+        group = GroupTrip.objects.create(trip=self.trip, created_by=self.alice)
+        group.members.create(user=self.alice)
+        group.members.create(user=self.bob)
+        item = self.trip.checklist_items.create(title='Passport')
+        ChecklistCheck.objects.create(item=item, user=self.bob)
+        self.assertEqual(_analytics()['completion_rate'], 50)
+
+    def test_activity_errors_and_ids_belong_to_one_day(self):
+        first = self.trip.itinerary_days.create(date=self.trip.start_date)
+        second = self.trip.itinerary_days.create(date=self.trip.end_date)
+        self.login(self.alice)
+        page = self.client.post(reverse('trip_detail', args=[self.trip.pk]), {'action': 'add_activity', 'day_id': first.pk})
+        for day in (first, second):
+            self.assertContains(page, f'id="id_day{day.pk}_title"', count=1)
+        self.assertContains(page, 'This field is required.', count=1)
+
+    def test_flight_limit_exempts_cached_misses(self):
+        from django.test import override_settings
+        from unittest.mock import patch
+
+        today = timezone.localdate()
+        flight = self.trip.flights.create(carrier_code='SQ', number='123', flight_date=today)
+        self.login(self.alice)
+        url = reverse('flight_status', args=[self.trip.pk, flight.pk])
+        with override_settings(FLIGHT_API_KEY='test'), patch('trips.views.rate_limited', return_value=True) as limit:
+            self.assertEqual(self.client.get(url).status_code, 429)
+            cache.set(f'flight-status:v2:SQ123:{today.isoformat()}', {})
+            self.assertFalse(self.client.get(url).json()['found'])
+            self.assertEqual(limit.call_count, 1)
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

@@ -856,3 +856,40 @@ document.querySelectorAll('[data-notice-form]').forEach((form) => {
     .then((r) => { if (r.ok) body.dataset.timezone = zone; })
     .catch(() => {});
 })();
+
+
+document.querySelectorAll('[data-expense-form]').forEach((form) => {
+  const payment = form.elements.payment_type;
+  const other = form.querySelector('[data-expense-other]');
+  const syncPayment = () => {
+    other.hidden = payment.value !== 'Other';
+    form.elements.title.disabled = other.hidden;
+  };
+  payment.addEventListener('change', syncPayment);
+  syncPayment();
+
+  const split = form.elements.split;
+  if (!split) return;
+  const groups = form.querySelectorAll('[data-expense-split]');
+  const syncSplit = () => {
+    groups.forEach((group) => {
+      const inactive = group.dataset.expenseSplit !== split.value;
+      group.hidden = inactive;
+      group.disabled = inactive;
+    });
+  };
+
+  split.addEventListener('change', syncSplit);
+  syncSplit();
+});
+
+
+const destinationCurrencies = document.getElementById('destination-currencies');
+if (destinationCurrencies) {
+  const currencies = JSON.parse(destinationCurrencies.textContent);
+  const country = document.getElementById('id_country');
+  const currency = document.getElementById('id_currency');
+  country.addEventListener('change', () => {
+    if (currencies[country.value] && !currency.disabled) currency.value = currencies[country.value];
+  });
+}

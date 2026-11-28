@@ -576,7 +576,7 @@ class ExchangeRateTests(TestCase):
         from .fx import exchange_rate, supported_currencies
 
         cache.clear()
-        with patch('trips.fx.urlopen', side_effect=[BytesIO(b'{"USD":"US Dollar"}'), BytesIO(b'{"rates":{"USD":1.25}}')]) as fetch:
+        with patch('trips.fx.urlopen', side_effect=[BytesIO(b'{"USD":"US Dollar"}'), BytesIO(b'{"rate":1.25}')]) as fetch:
             for _ in range(2):
                 self.assertIn('USD', supported_currencies())
                 self.assertEqual(exchange_rate('EUR', 'USD'), Decimal('1.25'))
@@ -621,16 +621,19 @@ class ExpenseFlowTests(TestCase):
         self.assertEqual(self.client.post(reverse('expense_delete', args=[self.trip.pk, expense.pk])).status_code, 302)
         self.assertFalse(self.trip.expenses.exists())
 
-    def test_manual_rate_fallback_and_saved_rate(self):
+    def test_automatic_rate_failure_and_saved_rate(self):
         from unittest.mock import patch
 
         cache.clear()
         self.client.force_login(self.owner)
         url = reverse('expense_add', args=[self.trip.pk])
         data = dict(self.data, currency='EUR')
-        with patch('trips.fx.urlopen', side_effect=TimeoutError) as fetch:
-            self.assertContains(self.client.post(url, data), 'enter the rate manually')
-            self.assertEqual(self.client.post(url, dict(data, manual_rate='2')).status_code, 302)
+        from io import BytesIO
+
+        with patch('trips.fx.urlopen', side_effect=[TimeoutError, BytesIO(b'{"rate":2}')]) as fetch:
+            self.assertContains(self.client.post(url, data), 'An automatic rate is unavailable')
+            self.assertFalse(self.trip.expenses.exists())
+            self.assertEqual(self.client.post(url, data).status_code, 302)
             expense = self.trip.expenses.get()
             edit = reverse('expense_edit', args=[self.trip.pk, expense.pk])
             self.assertEqual(self.client.post(edit, dict(data, amount='15')).status_code, 302)
@@ -679,7 +682,13 @@ class ExpenseFlowTests(TestCase):
         first = self.client.get(detail + '?tab=expenses')
         self.assertEqual(len(first.context['expense_page']), 25)
         self.assertNotContains(first, '=Formula')
-        self.assertContains(self.client.get(detail + '?tab=expenses&expense_page=2'), '=Formula')
+        self.assertContains(first, 'data-expense-split="equal"')
+        self.assertContains(first, 'data-expense-split="exact"')
+        self.assertContains(first, 'You owe')
+        second = self.client.get(detail + '?tab=expenses&expense_page=2')
+        self.assertContains(second, '=Formula')
+        self.assertContains(second, 'aria-label="Expense split"')
+        self.assertContains(second, '5.01 USD')
         self.assertContains(self.client.get(reverse('traveler_dashboard')), '-5.00 USD')
         export = reverse('expense_csv', args=[self.trip.pk])
         self.assertContains(self.client.get(export), "'=Formula")

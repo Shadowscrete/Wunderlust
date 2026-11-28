@@ -1,3 +1,5 @@
+from django.contrib import messages
+from django.http import Http404
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -6,8 +8,9 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 
 from .decorators import role_required
-from .expense_forms import ExpenseForm
-from .models import Trip
+from .balances import trip_balances
+from .expense_forms import ExpenseForm, SettlementForm
+from .models import Trip, trip_travelers
 from .views import _accessible_trips, _notify_group
 
 
@@ -49,4 +52,43 @@ def expense_delete(request, trip_id, expense_id):
     expense = get_object_or_404(allowed, pk=expense_id)
     expense.delete()
     _notify_group(trip, 'Trip expenses updated', f'{request.user.username} deleted the expense {expense.title}.', request.user.pk)
+    return _expense_redirect(trip)
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
+@transaction.atomic
+def settlement_add(request, trip_id):
+    trip = _ledger_trip(request, trip_id)
+    form = SettlementForm(request.POST)
+    if not form.is_valid():
+        for errors in form.errors.values():
+            for error in errors:
+                messages.error(request, error)
+        return _expense_redirect(trip)
+    data = form.cleaned_data
+    sender, recipient = data['from_user'], data['to_user']
+    if request.user.pk not in (trip.owner_id, sender, recipient):
+        raise Http404
+    people = set(trip_balances([trip.pk])[trip.pk])
+    people.update(user.pk for user, _ in trip_travelers(trip))
+    if not {sender, recipient} <= people:
+        raise Http404
+    trip.settlements.create(from_user_id=sender, to_user_id=recipient, amount=data['amount'], created_by=request.user)
+    _notify_group(trip, 'Trip expenses updated', f'{request.user.username} recorded a settlement.', request.user.pk)
+    return _expense_redirect(trip)
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
+@transaction.atomic
+def settlement_delete(request, trip_id, settlement_id):
+    trip = _ledger_trip(request, trip_id)
+    settlements = trip.settlements.all()
+    if request.user.pk != trip.owner_id:
+        from django.db.models import Q
+        settlements = settlements.filter(Q(from_user=request.user) | Q(to_user=request.user))
+    settlement = get_object_or_404(settlements, pk=settlement_id)
+    settlement.delete()
+    _notify_group(trip, 'Trip expenses updated', f'{request.user.username} removed a settlement.', request.user.pk)
     return _expense_redirect(trip)

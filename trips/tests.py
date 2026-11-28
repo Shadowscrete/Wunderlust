@@ -637,3 +637,28 @@ class ExpenseFlowTests(TestCase):
             self.assertEqual(fetch.call_count, 2)
         expense.refresh_from_db()
         self.assertEqual(expense.amount_in_trip_currency, 30)
+
+
+    def test_settlements_and_departed_travelers(self):
+        from .balances import suggested_transfers, trip_balances
+
+        self.client.force_login(self.owner)
+        self.client.post(reverse('expense_add', args=[self.trip.pk]), self.data)
+        balances = trip_balances([self.trip.pk])[self.trip.pk]
+        self.assertEqual(list(suggested_transfers(balances)), [(self.member.pk, self.owner.pk, 5)])
+        url = reverse('settlement_add', args=[self.trip.pk])
+        data = {'from_user': self.member.pk, 'to_user': self.owner.pk, 'amount': '5'}
+        self.assertEqual(self.client.post(url, dict(data, from_user=self.outsider.pk)).status_code, 404)
+        self.client.force_login(self.member)
+        detail = reverse('trip_detail', args=[self.trip.pk])
+        self.assertContains(self.client.get(detail), 'Your unsettled balance is -5.00 USD')
+        self.client.post(url, dict(data, amount='0'))
+        self.assertFalse(self.trip.settlements.exists())
+        self.client.post(url, data)
+        settlement = self.trip.settlements.get()
+        self.assertEqual(trip_balances([self.trip.pk])[self.trip.pk][self.member.pk], 0)
+        self.client.post(reverse('trip_leave', args=[self.trip.pk]))
+        self.assertEqual(self.client.post(reverse('settlement_delete', args=[self.trip.pk, settlement.pk])).status_code, 404)
+        self.client.force_login(self.owner)
+        self.client.post(reverse('settlement_delete', args=[self.trip.pk, settlement.pk]))
+        self.assertEqual(trip_balances([self.trip.pk])[self.trip.pk][self.member.pk], -5)

@@ -102,3 +102,15 @@ class ExpenseForm(forms.ModelForm):
             for pk, amount in self.allocations.items()
         ])
         return expense
+
+
+class SettlementForm(forms.Form):
+    from_user = forms.IntegerField(min_value=1)
+    to_user = forms.IntegerField(min_value=1)
+    amount = forms.DecimalField(max_digits=12, decimal_places=2, min_value=CENT)
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.errors and cleaned['from_user'] == cleaned['to_user']:
+            raise ValidationError('Choose two different travelers.')
+        return cleaned

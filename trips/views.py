@@ -16,6 +16,7 @@ from accounts.models import Profile
 
 from .decorators import role_required
 from .forms import ChecklistRenameForm, ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
+from .balances import ZERO, trip_balances
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
@@ -489,6 +490,9 @@ def trip_detail(request, trip_id):
             prefix = f'checklist-{item.pk}'
             item.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ChecklistRenameForm(instance=item, prefix=prefix)
     travelers = _readiness_rows(trip, request.user)
+    balances = trip_balances([trip.pk])[trip.pk]
+    for row in travelers:
+        row['expense_balance'] = balances.get(row['user'].pk, ZERO)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())
     travel_info = list(trip.travel_info.exclude(category=TravelInfo.Category.FLIGHT))
@@ -502,6 +506,7 @@ def trip_detail(request, trip_id):
         'essentials': essentials,
         **_my_totals(trip.pk, request.user),
         'travelers': travelers,
+        'expense_balance': balances.get(request.user.pk, ZERO),
         'ready_count': sum(1 for row in travelers if row['is_ready']),
         'travel_info': travel_info,
         'travel_info_form': travel_info_form,

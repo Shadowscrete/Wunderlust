@@ -2,6 +2,8 @@ from django.urls import path
 from . import admin_views, expense_views, views
 
 urlpatterns = [
+    path('trips/<int:trip_id>/expenses/settlements/add/', expense_views.settlement_add, name='settlement_add'),
+    path('trips/<int:trip_id>/expenses/settlements/<int:settlement_id>/delete/', expense_views.settlement_delete, name='settlement_delete'),
     path('trips/<int:trip_id>/expenses/add/', expense_views.expense_save, name='expense_add'),
     path('trips/<int:trip_id>/expenses/<int:expense_id>/edit/', expense_views.expense_save, name='expense_edit'),
     path('trips/<int:trip_id>/expenses/<int:expense_id>/delete/', expense_views.expense_delete, name='expense_delete'),

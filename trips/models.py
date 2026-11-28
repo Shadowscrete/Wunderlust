@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+from django.core.validators import MinValueValidator, RegexValidator
 from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
@@ -6,6 +9,10 @@ from django.utils.crypto import get_random_string
 
 def create_trip_code():
     return get_random_string(10, allowed_chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789')
+
+
+currency_code = RegexValidator(r'^[A-Z]{3}\Z', 'Enter a three-letter currency code.')
+positive_money = MinValueValidator(Decimal('0.01'))
 
 
 class Trip(models.Model):
@@ -19,6 +26,7 @@ class Trip(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='owned_trips')
     destination = models.CharField(max_length=160)
     country = models.CharField(max_length=100, blank=True)
+    currency = models.CharField(max_length=3, default='USD', validators=[currency_code])
     airline = models.CharField(max_length=120, blank=True)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -292,3 +300,51 @@ def sync_trip_statuses():
     active = Trip.objects.exclude(status__in=(Trip.Status.CANCELLED, Trip.Status.COMPLETED))
     active.filter(end_date__lt=today).update(status=Trip.Status.COMPLETED)
     active.filter(start_date__lte=today, end_date__gte=today).exclude(status=Trip.Status.IN_PROGRESS).update(status=Trip.Status.IN_PROGRESS)
+
+
+class Expense(models.Model):
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='expenses')
+    paid_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    title = models.CharField(max_length=160)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[positive_money])
+    currency = models.CharField(max_length=3, validators=[currency_code])
+    rate_to_trip = models.DecimalField(max_digits=24, decimal_places=12, validators=[MinValueValidator(Decimal('0.000000000001'))])
+    amount_in_trip_currency = models.DecimalField(max_digits=12, decimal_places=2, validators=[positive_money])
+    spent_on = models.DateField()
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at', '-pk')
+        constraints = [models.CheckConstraint(
+            condition=Q(amount__gt=0, amount_in_trip_currency__gt=0, rate_to_trip__gt=0),
+            name='expense_positive_amounts_and_rate',
+        )]
+
+
+class ExpenseShare(models.Model):
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='shares')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    amount_in_trip_currency = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=('expense', 'user'), name='unique_expense_share'),
+            models.CheckConstraint(condition=Q(amount_in_trip_currency__gte=0), name='expense_share_nonnegative'),
+        ]
+
+
+class Settlement(models.Model):
+    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='settlements')
+    from_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    to_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[positive_money])
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name='settlement_positive_amount'),
+            models.CheckConstraint(condition=~Q(from_user=F('to_user')) | Q(from_user__isnull=True), name='settlement_distinct_parties'),
+        ]

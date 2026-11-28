@@ -283,8 +283,10 @@ def _owned_trip(request, trip_id):
 
 
 @role_required(User.Role.TRAVELER)
+@transaction.atomic
 def trip_edit(request, trip_id):
-    trip = _owned_trip(request, trip_id)
+    trip = get_object_or_404(Trip.objects.select_for_update() if request.method == 'POST' else Trip,
+                            pk=trip_id, owner=request.user)
     form = TripEditForm(request.POST or None, instance=trip)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():

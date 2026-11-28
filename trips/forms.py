@@ -287,13 +287,14 @@ class TripEditForm(TripForm):
     status = forms.ChoiceField(label='Status')
 
     class Meta(TripForm.Meta):
-        fields = ('destination', 'country', 'start_date', 'end_date')
+        fields = ('destination', 'country', 'start_date', 'end_date', 'currency')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name in ('places', 'generate_itinerary', 'has_ticket', 'flight_number', 'flight_date'):
             del self.fields[name]
         trip = self.instance
+        self.fields['currency'].required = False
         self.original_start = trip.start_date
         # In-progress / completed come from the dates; show the current one but only offer the editable ones.
         choices = [(value, label) for value, label in Trip.Status.choices if value in self.EDITABLE_STATUSES]
@@ -308,6 +309,12 @@ class TripEditForm(TripForm):
         self.fields['end_date'].widget.attrs['min'] = earliest
         self.fields['end_date'].help_text = 'Shortening the trip removes itinerary days outside the new dates.'
         self.order_fields(['destination', 'country', 'start_date', 'end_date', 'status'])
+
+    def clean_currency(self):
+        currency = self.cleaned_data['currency'] or self.instance.currency
+        if currency != self.instance.currency and (self.instance.expenses.exists() or self.instance.settlements.exists()):
+            raise forms.ValidationError('The currency cannot change while this trip has expenses or settlements.')
+        return currency
 
     def save(self, commit=True):
         trip = super().save(commit=False)

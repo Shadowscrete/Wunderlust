@@ -550,3 +550,18 @@ class PlatformTests(TestCase):
         self.assertIn('Get the group', home)
         self.assertIn('rel="manifest"', home)
         self.assertIn('Forgot password?', self.client.get(reverse('login')).content.decode())
+
+
+class ExpenseModelTests(TestCase):
+    def test_trip_currency_defaults_to_usd_and_is_editable(self):
+        owner = User.objects.create_user('expense-owner')
+        date = timezone.localdate() + timedelta(days=3)
+        trip = Trip.objects.create(owner=owner, destination='Oslo', start_date=date, end_date=date)
+        self.assertEqual(trip.currency, 'USD')
+        self.client.force_login(owner)
+        url = reverse('trip_edit', args=[trip.pk])
+        data = {'destination': trip.destination, 'start_date': date, 'end_date': date, 'status': trip.status}
+        self.assertContains(self.client.post(url, dict(data, currency='12')), 'three-letter currency code')
+        self.assertEqual(self.client.post(url, dict(data, currency='NOK')).status_code, 302)
+        trip.refresh_from_db()
+        self.assertEqual(trip.currency, 'NOK')

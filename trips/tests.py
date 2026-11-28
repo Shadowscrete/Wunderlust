@@ -83,6 +83,22 @@ class AdminPanelTests(TestCase):
         self.alice.refresh_from_db()
         self.assertEqual((self.alice.username, self.alice.email, self.alice.first_name), ('alice', data['email'], ''))
 
+    def test_edit_suggested_activity_as_member(self):
+        from .models import GroupTrip
+
+        GroupTrip.objects.create(trip=self.trip, created_by=self.alice).members.create(user=self.bob)
+        day = self.trip.itinerary_days.create(date=self.trip.start_date)
+        activity = day.activities.create(title='Walk', is_recommended=True)
+        self.login(self.bob)
+        response = self.client.post(reverse('trip_detail', args=[self.trip.pk]), {
+            'action': 'edit_activity', 'activity_id': activity.pk, f'activity-{activity.pk}-title': 'Museum',
+        })
+        self.assertEqual(response.status_code, 302)
+        activity.refresh_from_db()
+        self.assertEqual(activity.title, 'Museum')
+        self.assertFalse(activity.is_recommended)
+        self.assertTrue(Notification.objects.filter(user=self.alice, title='Itinerary updated').exists())
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

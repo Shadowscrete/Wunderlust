@@ -130,7 +130,7 @@ class ActivityForm(forms.ModelForm):
         labels = {'title': 'Activity', 'start_time': 'Time (optional)', 'location': 'Place (optional)'}
         widgets = {
             'title': forms.TextInput(attrs={'placeholder': 'e.g. Visit Senso-ji Temple'}),
-            'start_time': forms.TimeInput(attrs={'type': 'time', 'title': 'Leave empty for a flexible time'}),
+            'start_time': forms.TimeInput(format='%H:%M:%S', attrs={'type': 'time', 'title': 'Leave empty for a flexible time'}),
             'location': forms.TextInput(attrs={'placeholder': 'e.g. Asakusa, Tokyo'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
         }

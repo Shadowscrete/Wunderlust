@@ -352,6 +352,7 @@ def trip_detail(request, trip_id):
     travel_info_form = TripTravelInfoForm(prefix='info')
     checklist_form = CustomChecklistForm(prefix='item')
     submitted_day_id = None
+    bound_edit = None
     itinerary_day_form = ItineraryDayForm(trip)
     flight_form = FlightForm(trip, prefix='flight')
     active_tab = 'overview'
@@ -396,6 +397,16 @@ def trip_detail(request, trip_id):
                 _notify_group(trip, 'Preparation list updated', f'{item.title} was added to the checklist.', request.user.pk)
                 messages.success(request, 'Custom item added.')
                 return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#preparation")
+        elif action == 'edit_activity':
+            activity = get_object_or_404(Activity, pk=_post_id(request, 'activity_id'), day__trip=trip)
+            form = ActivityForm(request.POST, instance=activity, prefix=f'activity-{activity.pk}')
+            if form.is_valid():
+                activity = form.save(commit=False)
+                activity.is_recommended = False
+                activity.save(update_fields=['title', 'start_time', 'location', 'notes', 'is_recommended'])
+                _notify_group(trip, 'Itinerary updated', f'{request.user.username} edited {activity.title} in the itinerary.', request.user.pk)
+                return redirect('trip_detail', trip_id=trip.pk)
+            bound_edit = form
         elif action == 'add_activity':
             day = get_object_or_404(trip.itinerary_days, pk=_post_id(request, 'day_id'))
             submitted_day_id = day.pk
@@ -428,6 +439,9 @@ def trip_detail(request, trip_id):
                 return redirect('trip_detail', trip_id=trip.pk)
     days = trip.itinerary_days.prefetch_related('activities').all()
     for day in days:
+        for activity in day.activities.all():
+            prefix = f'activity-{activity.pk}'
+            activity.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ActivityForm(instance=activity, prefix=prefix)
         day.activity_form = activity_form if day.pk == submitted_day_id else ActivityForm(auto_id=f'id_day{day.pk}_%s')
     travelers = _readiness_rows(trip, request.user)
     group_trip = getattr(trip, 'group_trip', None)

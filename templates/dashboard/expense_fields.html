@@ -1,13 +1,39 @@
-<form class="feature-form compact-form" method="post" action="{% if expense %}{% url 'expense_edit' trip.pk expense.pk %}{% else %}{% url 'expense_add' trip.pk %}{% endif %}">
+<form class="feature-form expense-form" method="post" data-expense-form action="{% if expense %}{% url 'expense_edit' trip.pk expense.pk %}{% else %}{% url 'expense_add' trip.pk %}{% endif %}">
     {% csrf_token %}
-    <p>For an equal split, select travelers. For exact amounts, fill in each traveler?s share in {{ trip.currency }}.</p>
     {{ form.non_field_errors }}
-    {% for field in form %}
-        <div class="form-field">
-            {{ field.label_tag }}{{ field }}
-            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-            {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    <div class="expense-form-grid">
+        {% include "dashboard/expense_field.html" with field=form.payment_type full_width=True %}
+        <div class="expense-field-wide" data-expense-other>
+            {% include "dashboard/expense_field.html" with field=form.title %}
         </div>
-    {% endfor %}
-    <button class="button button-primary" type="submit">Save expense</button>
+        {% include "dashboard/expense_field.html" with field=form.paid_by %}
+        {% include "dashboard/expense_field.html" with field=form.spent_on %}
+        {% include "dashboard/expense_field.html" with field=form.amount %}
+        {% include "dashboard/expense_field.html" with field=form.currency %}
+        {% include "dashboard/expense_field.html" with field=form.notes full_width=True %}
+    </div>
+    <p class="expense-rate-note">Foreign-currency expenses convert to {{ trip.currency }} using Frankfurter reference rates.</p>
+    {% if not form.is_solo %}
+    <div class="expense-form-grid">
+        {% include "dashboard/expense_field.html" with field=form.split %}
+    </div>
+    <fieldset data-expense-split="equal">
+        <legend>Split between</legend>
+        <div class="expense-traveler-options">
+            {% for traveler in form.travelers %}
+                <label for="{{ traveler.id_for_label }}">{{ traveler.tag }}<span>{{ traveler.choice_label }}</span></label>
+            {% endfor %}
+        </div>
+        {% for error in form.travelers.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </fieldset>
+    <fieldset data-expense-split="exact">
+        <legend>Share per traveler ({{ trip.currency }})</legend>
+        <div class="expense-form-grid">
+            {% for field in form.exact_fields %}{% include "dashboard/expense_field.html" %}{% endfor %}
+        </div>
+    </fieldset>
+    {% endif %}
+    <div class="expense-form-actions">
+        <button class="button button-primary" type="submit">Save expense</button>
+    </div>
 </form>

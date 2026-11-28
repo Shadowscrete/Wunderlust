@@ -9,6 +9,9 @@ from datetime import timedelta
 from .models import Activity, Checklist, Flight, ItineraryDay, Notification, TravelInfo, Trip
 
 
+from .currencies import COUNTRY_CURRENCY, currency_choices
+
+
 class TripForm(forms.ModelForm):
     country = forms.ChoiceField(choices=COUNTRY_CHOICES, label='Country')
     has_ticket = forms.ChoiceField(
@@ -66,6 +69,14 @@ class TripForm(forms.ModelForm):
         if cleaned.get('has_ticket') == 'yes':
             self._clean_ticket(cleaned, start_date, end_date)
         return cleaned
+
+    def save(self, commit=True):
+        trip = super().save(commit=False)
+        if trip._state.adding:
+            trip.currency = COUNTRY_CURRENCY.get(trip.country, trip.currency)
+        if commit:
+            trip.save()
+        return trip
 
     def _clean_ticket(self, cleaned, start_date, end_date):
         raw = cleaned.get('flight_number', '')
@@ -294,7 +305,14 @@ class TripEditForm(TripForm):
         for name in ('places', 'generate_itinerary', 'has_ticket', 'flight_number', 'flight_date'):
             del self.fields[name]
         trip = self.instance
-        self.fields['currency'].required = False
+        self.fields['currency'] = forms.ChoiceField(
+            choices=currency_choices(trip.currency), required=False,
+            error_messages={'invalid_choice': 'Select a listed three-letter currency code.'},
+        )
+        self.fields['currency'].help_text = 'Changing the country selects its default currency.'
+        if trip.expenses.exists() or trip.settlements.exists():
+            self.fields['currency'].disabled = True
+            self.fields['currency'].help_text = 'The ledger currency is locked because this trip has financial history.'
         self.original_start = trip.start_date
         # In-progress / completed come from the dates; show the current one but only offer the editable ones.
         choices = [(value, label) for value, label in Trip.Status.choices if value in self.EDITABLE_STATUSES]
@@ -311,9 +329,13 @@ class TripEditForm(TripForm):
         self.order_fields(['destination', 'country', 'start_date', 'end_date', 'status'])
 
     def clean_currency(self):
-        currency = self.cleaned_data['currency'] or self.instance.currency
-        if currency != self.instance.currency and (self.instance.expenses.exists() or self.instance.settlements.exists()):
-            raise forms.ValidationError('The currency cannot change while this trip has expenses or settlements.')
+        current = self.instance.currency
+        entered = self.cleaned_data['currency']
+        currency = entered or current
+        country = self.cleaned_data.get('country')
+        if country and country != self.instance.country and currency == current:
+            if not self.fields['currency'].disabled:
+                return COUNTRY_CURRENCY.get(country, current)
         return currency
 
     def save(self, commit=True):

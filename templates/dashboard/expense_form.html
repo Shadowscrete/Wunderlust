@@ -1,6 +1,9 @@
 {% extends "dashboard/base.html" %}
+{% block title %}{% if expense %}Edit expense{% else %}Add expense{% endif %} | Wunderlust{% endblock %}
 {% block content %}
-<h1>{% if expense %}Edit expense{% else %}Add expense{% endif %}</h1>
-<p><a href="{% url 'trip_detail' trip.pk %}?tab=expenses#panel-expenses">Back to {{ trip.destination }}</a></p>
-{% include "dashboard/expense_fields.html" %}
+<a class="back-link" href="{% url 'trip_detail' trip.pk %}?tab=expenses#panel-expenses">{{ trip.destination }} expenses</a>
+<div class="page-heading"><h1>{% if expense %}Edit expense{% else %}Add expense{% endif %}</h1></div>
+<section class="dashboard-section trip-form-panel">
+    {% include "dashboard/expense_fields.html" %}
+</section>
 {% endblock %}

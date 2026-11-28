@@ -8,7 +8,7 @@ from django.core.cache import cache
 
 RATE_STEP = Decimal('0.000000000001')
 CENT = Decimal('0.01')
-UNAVAILABLE = 'Exchange rates are unavailable right now; enter the rate manually'
+UNAVAILABLE = 'An automatic rate is unavailable for this currency pair right now. Please try again later.'
 
 
 class ExchangeRateUnavailable(Exception):
@@ -28,6 +28,9 @@ def supported_currencies():
     currencies = cache.get(key)
     if currencies is None:
         currencies = _fetch('currencies')
+        if isinstance(currencies, list):
+            currencies = {row['iso_code']: row['name'] for row in currencies
+                          if isinstance(row, dict) and 'iso_code' in row and 'name' in row}
         if not isinstance(currencies, dict) or not currencies:
             raise ExchangeRateUnavailable(UNAVAILABLE)
         cache.set(key, currencies, 86400)
@@ -40,12 +43,16 @@ def exchange_rate(source, target):
     key = f'fx:{settings.FX_API_BASE_URL}:{source}:{target}'
     rate = cache.get(key)
     if rate is None:
-        query = urlencode({'base': source, 'symbols': target})
         try:
-            rate = Decimal(str(_fetch(f'latest?{query}')['rates'][target])).quantize(RATE_STEP, rounding=ROUND_HALF_UP)
+            if settings.FX_API_BASE_URL.rstrip('/').endswith('/v1'):
+                query = urlencode({'base': source, 'symbols': target})
+                value = _fetch(f'latest?{query}')['rates'][target]
+            else:
+                value = _fetch(f'rate/{source}/{target}')['rate']
+            rate = Decimal(str(value)).quantize(RATE_STEP, rounding=ROUND_HALF_UP)
             if not 0 < rate < 10**12:
                 raise ValueError('Rate is outside the supported range')
         except (KeyError, TypeError, ValueError, DecimalException) as exc:
             raise ExchangeRateUnavailable(UNAVAILABLE) from exc
-        cache.set(key, rate, 43200)
+        cache.set(key, rate, 3600)
     return rate

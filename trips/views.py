@@ -17,6 +17,7 @@ from accounts.models import Profile
 from .decorators import role_required
 from .forms import ChecklistRenameForm, ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
 from .airline_marks import airline_mark
+from .currencies import COUNTRY_CURRENCY
 from .balances import ZERO, suggested_transfers, trip_balances
 from .expense_forms import ExpenseForm
 from .models import NotificationRead
@@ -312,7 +313,7 @@ def trip_edit(request, trip_id):
         _notify_group(trip, 'Trip details updated', f'{request.user.get_username()} updated the trip to {trip.destination}.', request.user.pk)
         messages.success(request, f'Trip updated. Itinerary days added: {len(missing)}. Removed: {removed}.')
         return redirect('trip_detail', trip_id=trip.pk)
-    return render(request, 'dashboard/trip_form.html', {'form': form, 'trip': trip, 'editing': True})
+    return render(request, 'dashboard/trip_form.html', {'form': form, 'trip': trip, 'editing': True, 'destination_currencies': COUNTRY_CURRENCY})
 
 
 @role_required(User.Role.TRAVELER)
@@ -517,9 +518,13 @@ def trip_detail(request, trip_id):
             return f'{former[pk].username} (left)'
         return 'Deleted traveler'
 
-    expense_page = Paginator(trip.expenses.select_related('paid_by'), 25).get_page(request.GET.get('expense_page'))
+    expense_page = Paginator(trip.expenses.prefetch_related('shares'), 25).get_page(request.GET.get('expense_page'))
     for expense in expense_page:
         expense.payer_label = traveler_label(expense.paid_by_id)
+        expense.split_rows = [
+            (traveler_label(share.user_id), share.amount_in_trip_currency)
+            for share in expense.shares.all()
+        ]
     transfers = [
         {'sender': sender, 'recipient': recipient, 'sender_name': traveler_label(sender),
          'recipient_name': traveler_label(recipient), 'amount': amount,
@@ -544,6 +549,7 @@ def trip_detail(request, trip_id):
         **_my_totals(trip.pk, request.user),
         'travelers': travelers,
         'expense_balance': balances.get(request.user.pk, ZERO),
+        'expense_balance_magnitude': abs(balances.get(request.user.pk, ZERO)),
         'ready_count': sum(1 for row in travelers if row['is_ready']),
         'travel_info': travel_info,
         'travel_info_form': travel_info_form,

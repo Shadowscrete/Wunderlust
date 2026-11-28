@@ -4,15 +4,25 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from .currencies import COUNTRY_CURRENCY, currency_choices
 from .fx import CENT, ExchangeRateUnavailable, exchange_rate
 from .models import Expense, ExpenseShare, trip_travelers
 
 
+PAYMENT_TYPES = ('Accommodation', 'Flights', 'Local transport', 'Car rental', 'Fuel',
+                 'Meals', 'Groceries', 'Activities', 'Shopping', 'Insurance', 'Fees', 'Other')
+
+
 class ExpenseForm(forms.ModelForm):
+    payment_type = forms.ChoiceField(label='Title', choices=[(name, name) for name in PAYMENT_TYPES])
+    title = forms.CharField(max_length=160, required=False, label='Other payment title')
     split = forms.ChoiceField(choices=[('equal', 'Equal split'), ('exact', 'Exact amounts')], initial='equal')
     travelers = forms.TypedMultipleChoiceField(coerce=int, required=False, widget=forms.CheckboxSelectMultiple)
-    manual_rate = forms.DecimalField(max_digits=24, decimal_places=12, min_value=Decimal('0.000000000001'),
-                                     required=False, help_text='Trip currency per unit of the expense currency.')
+    currency = forms.ChoiceField()
+
+    @property
+    def exact_fields(self):
+        return [self[name] for _, name in self.exact_names]
 
     class Meta:
         model = Expense
@@ -28,19 +38,33 @@ class ExpenseForm(forms.ModelForm):
         for user in [self.instance.paid_by, *(share.user for share in shares)]:
             if user:
                 people.setdefault(user.pk, user)
+        self.is_solo = len(people) == 1 and not any(share.user_id is None for share in shares)
+        self.solo_user_id = next(iter(people)) if self.is_solo else None
+        if self.is_solo:
+            self.fields.pop('split')
+            self.fields.pop('travelers')
+        title = self.instance.title
+        self.initial['payment_type'] = title if title in PAYMENT_TYPES else 'Other' if title else 'Meals'
+        self.initial['title'] = title if title not in PAYMENT_TYPES else ''
+        # Older clients used a free-text title. Interpret that input as a category or Other.
+        if self.is_bound and 'payment_type' not in self.data and self.data.get('title'):
+            self.data = self.data.copy()
+            legacy_title = self.data['title']
+            self.data['payment_type'] = legacy_title if legacy_title in PAYMENT_TYPES else 'Other'
         self.fields['paid_by'] = forms.TypedChoiceField(
             label='Paid by', choices=[(pk, user.username) for pk, user in people.items()], coerce=int,
         )
-        self.fields['travelers'].choices = self.fields['paid_by'].choices
-        self.fields['currency'].help_text = 'Enter a three-letter currency code, such as USD or EUR.'
+        if not self.is_solo:
+            self.fields['travelers'].choices = self.fields['paid_by'].choices
+        self.fields['currency'].choices = currency_choices(trip.currency, self.instance.currency)
         self.initial.update({'paid_by': self.instance.paid_by_id or viewer.pk,
                              'spent_on': self.instance.spent_on or timezone.localdate(),
-                             'currency': self.instance.currency or trip.currency,
+                             'currency': self.instance.currency or COUNTRY_CURRENCY.get(trip.country, trip.currency),
                              'travelers': [share.user_id for share in shares] if shares else list(people),
                              'split': 'exact' if shares else 'equal'})
         existing = {share.user_id: share.amount_in_trip_currency for share in shares}
         self.exact_names = []
-        for pk, user in people.items():
+        for pk, user in (() if self.is_solo else people.items()):
             name = f'exact_{pk}'
             self.exact_names.append((pk, name))
             self.fields[name] = forms.DecimalField(
@@ -48,13 +72,12 @@ class ExpenseForm(forms.ModelForm):
                 min_value=0, initial=existing.get(pk),
             )
 
-    def clean_currency(self):
-        return self.cleaned_data['currency'].upper()
-
     def clean(self):
         cleaned = super().clean()
         if self.errors:
             return cleaned
+        payment = cleaned['payment_type']
+        cleaned['title'] = (cleaned['title'] or 'Other') if payment == 'Other' else payment
         currency = cleaned['currency']
         if self.instance.pk and currency == self.instance.currency:
             rate = self.instance.rate_to_trip
@@ -62,14 +85,14 @@ class ExpenseForm(forms.ModelForm):
             try:
                 rate = exchange_rate(currency, self.trip.currency)
             except ExchangeRateUnavailable as exc:
-                rate = cleaned['manual_rate']
-                if rate is None:
-                    self.add_error('manual_rate', str(exc))
-                    return cleaned
+                self.add_error('currency', str(exc))
+                return cleaned
         total = (cleaned['amount'] * rate).quantize(CENT, rounding=ROUND_HALF_UP)
         if not 0 < total < 10**10:
             raise ValidationError('The converted total must be between 0.01 and 9,999,999,999.99.')
-        if cleaned['split'] == 'equal':
+        if self.is_solo:
+            self.allocations = {self.solo_user_id: total}
+        elif cleaned['split'] == 'equal':
             users = sorted(set(cleaned['travelers']))
             if not users:
                 self.add_error('travelers', 'Select at least one traveler.')

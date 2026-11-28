@@ -14,6 +14,14 @@
 }
 /* ---- Theme tokens (generated). Light values keep the original look; dark values are their counterparts. ---- */
 :root {
+  --airline-1-bg:#e1eee3;--airline-1-fg:#294a34;
+  --airline-2-bg:#e4ece0;--airline-2-fg:#3d4d2d;
+  --airline-3-bg:#e0efeb;--airline-3-fg:#245148;
+  --airline-4-bg:#e1eaf0;--airline-4-fg:#2e4b60;
+  --airline-5-bg:#efeadd;--airline-5-fg:#59482d;
+  --airline-6-bg:#eee5eb;--airline-6-fg:#59394e;
+  --airline-7-bg:#e8e7f0;--airline-7-fg:#453e63;
+  --airline-8-bg:#e8ece9;--airline-8-fg:#364b41;
   --c-183a29:#183a29;
   --c-202b22:#202b22;
   --c-203f2e:#203f2e;
@@ -113,6 +121,14 @@
   --c-topbar:rgba(255,255,255,.84);
 }
 :root[data-theme="dark"] {
+  --airline-1-bg:#293e31;--airline-1-fg:#d1ecd7;
+  --airline-2-bg:#333f2b;--airline-2-fg:#e0ebd0;
+  --airline-3-bg:#25413a;--airline-3-fg:#ccece3;
+  --airline-4-bg:#293c4a;--airline-4-fg:#d7e9f4;
+  --airline-5-bg:#44392a;--airline-5-fg:#f0e4ca;
+  --airline-6-bg:#44323f;--airline-6-fg:#f2ddea;
+  --airline-7-bg:#3b354c;--airline-7-fg:#e6def5;
+  --airline-8-bg:#303c36;--airline-8-fg:#dce9e0;
   --page:#121613;
   --surface:#1a201b;
   --ink:#e3e8e2;
@@ -224,6 +240,14 @@
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
+  --airline-1-bg:#293e31;--airline-1-fg:#d1ecd7;
+  --airline-2-bg:#333f2b;--airline-2-fg:#e0ebd0;
+  --airline-3-bg:#25413a;--airline-3-fg:#ccece3;
+  --airline-4-bg:#293c4a;--airline-4-fg:#d7e9f4;
+  --airline-5-bg:#44392a;--airline-5-fg:#f0e4ca;
+  --airline-6-bg:#44323f;--airline-6-fg:#f2ddea;
+  --airline-7-bg:#3b354c;--airline-7-fg:#e6def5;
+  --airline-8-bg:#303c36;--airline-8-fg:#dce9e0;
   --page:#121613;
   --surface:#1a201b;
   --ink:#e3e8e2;
@@ -2419,6 +2443,14 @@ html{scrollbar-gutter:stable}
 /* Flights (Travel information tab) */
 .trip-info-panel{display:grid;gap:18px}
 .flight-row{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.airline-mark--c1{background:var(--airline-1-bg);color:var(--airline-1-fg)}
+.airline-mark--c2{background:var(--airline-2-bg);color:var(--airline-2-fg)}
+.airline-mark--c3{background:var(--airline-3-bg);color:var(--airline-3-fg)}
+.airline-mark--c4{background:var(--airline-4-bg);color:var(--airline-4-fg)}
+.airline-mark--c5{background:var(--airline-5-bg);color:var(--airline-5-fg)}
+.airline-mark--c6{background:var(--airline-6-bg);color:var(--airline-6-fg)}
+.airline-mark--c7{background:var(--airline-7-bg);color:var(--airline-7-fg)}
+.airline-mark--c8{background:var(--airline-8-bg);color:var(--airline-8-fg)}
 .flight-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:10px;background:var(--green-soft);color:var(--green)}
 .flight-main,.flight-when{display:flex;flex-direction:column;min-width:0}
 .flight-number{font-size:15px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums}

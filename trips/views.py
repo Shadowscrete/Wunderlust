@@ -290,9 +290,18 @@ def trip_edit(request, trip_id):
         with transaction.atomic():
             trip = form.save()
             # Itinerary days outside the new dates no longer belong to the trip.
-            removed, _ = trip.itinerary_days.exclude(date__range=(trip.start_date, trip.end_date)).delete()
+            existing = set(trip.itinerary_days.values_list('date', flat=True))
+            _, deleted = trip.itinerary_days.exclude(date__range=(trip.start_date, trip.end_date)).delete()
+            removed = deleted.get(ItineraryDay._meta.label, 0)
+            missing = []
+            if existing:
+                for offset in range((trip.end_date - trip.start_date).days + 1):
+                    date = trip.start_date + timedelta(days=offset)
+                    if date not in existing:
+                        missing.append(ItineraryDay(trip=trip, date=date))
+                ItineraryDay.objects.bulk_create(missing)
         _notify_group(trip, 'Trip details updated', f'{request.user.get_username()} updated the trip to {trip.destination}.', request.user.pk)
-        messages.success(request, 'Trip updated.' + (' Itinerary days outside the new dates were removed.' if removed else ''))
+        messages.success(request, f'Trip updated. Itinerary days added: {len(missing)}. Removed: {removed}.')
         return redirect('trip_detail', trip_id=trip.pk)
     return render(request, 'dashboard/trip_form.html', {'form': form, 'trip': trip, 'editing': True})
 

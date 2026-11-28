@@ -197,6 +197,16 @@ class PreparationAndItineraryTests(TestCase):
         trip.refresh_from_db()
         self.assertEqual(trip.status, Trip.Status.READY)
 
+    def test_edit_extends_existing_itinerary(self):
+        trip = self.create_trip('Kyoto', 'Japan')
+        end = trip.end_date + timedelta(days=2)
+        response = self.client.post(reverse('trip_edit', args=[trip.pk]), {
+            'destination': trip.destination, 'country': trip.country, 'start_date': trip.start_date,
+            'end_date': end, 'status': trip.status,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(trip.itinerary_days.filter(date=end, title='', notes='').exists())
+
     def test_optional_items_can_be_removed_only_by_trip_travelers(self):
         trip = self.create_trip('Kyoto', 'Japan')
         mandatory = trip.checklist_items.filter(is_mandatory=True).first()

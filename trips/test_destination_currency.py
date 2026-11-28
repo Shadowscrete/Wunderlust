@@ -72,6 +72,8 @@ class DestinationCurrencyTests(TestCase):
         date = timezone.localdate()
         trip = Trip.objects.create(owner=owner, destination='Tokyo', country='Japan',
                                    start_date=date, end_date=date, currency='USD')
+        detail = reverse('trip_detail', args=[trip.pk])
+        self.assertNotContains(self.client.get(detail), 'Who owes whom')
         url = reverse('expense_add', args=[trip.pk])
         page = self.client.get(url)
         self.assertContains(page, 'name="payment_type"')

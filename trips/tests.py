@@ -685,6 +685,7 @@ class ExpenseFlowTests(TestCase):
         self.assertContains(first, 'data-expense-split="equal"')
         self.assertContains(first, 'data-expense-split="exact"')
         self.assertContains(first, 'You owe')
+        self.assertContains(first, 'Who owes whom')
         second = self.client.get(detail + '?tab=expenses&expense_page=2')
         self.assertContains(second, '=Formula')
         self.assertContains(second, 'aria-label="Expense split"')

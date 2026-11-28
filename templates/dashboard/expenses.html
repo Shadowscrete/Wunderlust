@@ -48,6 +48,7 @@
         </section>
 
         <div class="trip-side-column">
+            {% if trip.is_group_trip %}
             <section class="dashboard-section detail-section">
                 <div class="section-heading"><h2>Who owes whom</h2></div>
                 {% for transfer in transfers %}
@@ -80,6 +81,7 @@
                     </details>
                 {% endif %}
             </section>
+            {% endif %}
             <section class="dashboard-section detail-section">
                 <div class="section-heading"><h2>Traveler balances</h2></div>
                 <dl class="expense-breakdown">

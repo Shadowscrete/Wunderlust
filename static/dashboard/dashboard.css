@@ -2961,10 +2961,11 @@ html{scrollbar-gutter:stable}
 }
 .expense-traveler-options input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--green) }
 .expense-rate-note { margin: 0; color: var(--muted) }
-.expense-form-actions { display: flex; justify-content: flex-end }
+.expense-totals-solo { grid-template-columns: minmax(0, 1fr); max-width: 320px }
+.expense-form-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end }
 @media (max-width: 600px) {
   .expense-form-grid, .expense-traveler-options { grid-template-columns: minmax(0, 1fr) }
-  .expense-form-actions .button { width: 100% }
+  .expense-form-actions .button { flex: 1 1 120px }
 }
 
 

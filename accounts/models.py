@@ -26,6 +26,16 @@ def avatar_upload_path(instance, filename):
 
 
 class Profile(models.Model):
+    class ReferralSource(models.TextChoices):
+        FRIEND = 'friend', 'Friend or family'
+        INVITE = 'invite', 'Trip invitation'
+        SEARCH = 'search', 'Search engine'
+        SOCIAL = 'social', 'Social media'
+        CREATOR = 'creator', 'Travel creator or blog'
+        COMMUNITY = 'community', 'Online community'
+        OTHER = 'other', 'Other'
+
+    referral_source = models.CharField(max_length=16, choices=ReferralSource.choices, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     bio = models.TextField(blank=True)
     location = models.CharField(max_length=100, blank=True)

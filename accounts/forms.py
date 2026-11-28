@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 from django import forms
@@ -30,7 +31,7 @@ class AboutMeForm(forms.Form):
     username = forms.CharField(required=False, disabled=True)
     email = forms.EmailField(required=False)
     location = forms.ChoiceField(choices=COUNTRY_CHOICES, required=False, label='Country')
-    birth_date = forms.DateField(required=False, label='Birthday', widget=forms.DateInput(attrs={'type': 'date'}))
+    birth_date = forms.DateField(required=False, label='Birthday', widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}))
     bio = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 3, 'maxlength': 500}), max_length=500)
 
     current_password = forms.CharField(required=False, strip=False, label='Current password (to change email)',
@@ -50,7 +51,8 @@ class AboutMeForm(forms.Form):
         # The date picker only offers past dates; clean_birth_date enforces it on the server too.
         yesterday = timezone.localdate() - timedelta(days=1)
         self.fields['birth_date'].widget.attrs.update({'max': yesterday.isoformat(), 'min': '1900-01-01'})
-        self.fields['username'].widget.attrs['class'] = 'is-locked'
+        if 'username' in self.fields:
+            self.fields['username'].widget.attrs['class'] = 'is-locked'
 
     def clean_current_password(self):
         password = self.cleaned_data.get('current_password')
@@ -62,6 +64,8 @@ class AboutMeForm(forms.Form):
     def clean_birth_date(self):
         birth_date = self.cleaned_data.get('birth_date')
         if birth_date and not self.fields['birth_date'].disabled:
+            if self.is_bound and not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', self.data.get(self.add_prefix('birth_date'), '')):
+                raise forms.ValidationError('Enter a valid date in YYYY-MM-DD format.')
             if birth_date >= timezone.localdate():
                 raise forms.ValidationError('Your birthday must be a date in the past.')
             if birth_date.year < 1900:
@@ -87,6 +91,35 @@ class AboutMeForm(forms.Form):
             self.user.save(update_fields=user_changed)
         if profile_changed:
             self.profile.save()
+
+
+class ProfileSetupForm(AboutMeForm):
+    bio = None
+    referral_source = forms.ChoiceField(choices=[('', 'Select a source'), *Profile.ReferralSource.choices],
+                                        required=False, label='How you heard about us')
+    PROFILE_FIELDS = ('location', 'birth_date', 'referral_source')
+    username = None
+    email = None
+    current_password = None
+    minimum_age = 13
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        today = timezone.localdate()
+        target_year = today.year - self.minimum_age
+        try:
+            self.latest_birth_date = today.replace(year=target_year)
+        except ValueError:
+            self.latest_birth_date = today.replace(year=target_year, day=28)
+        self.fields['birth_date'].widget.attrs.update({
+            'max': self.latest_birth_date.isoformat(), 'autocomplete': 'bday',
+        })
+
+    def clean_birth_date(self):
+        birth_date = super().clean_birth_date()
+        if birth_date and birth_date > self.latest_birth_date:
+            raise forms.ValidationError(f'You must be at least {self.minimum_age} years old to continue.')
+        return birth_date
 
 
 class DeleteAccountForm(forms.Form):

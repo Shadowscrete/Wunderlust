@@ -536,6 +536,7 @@ def trip_detail(request, trip_id):
         settlement.sender_label = traveler_label(settlement.from_user_id)
         settlement.recipient_label = traveler_label(settlement.to_user_id)
     return render(request, 'dashboard/trip_detail.html', {
+        'show_shared_expenses': len(current) > 1 or bool(former) or bool(settlements) or bool(transfers),
         'expense_rows': [(traveler_label(pk), balances.get(pk, ZERO)) for pk in [*current, *(pk for pk in balances if pk not in current)]],
         'expense_page': expense_page,
         'expense_total': trip.expenses.aggregate(total=Sum('amount_in_trip_currency', default=ZERO))['total'],

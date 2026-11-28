@@ -868,6 +868,20 @@ document.querySelectorAll('[data-expense-form]').forEach((form) => {
   payment.addEventListener('change', syncPayment);
   syncPayment();
 
+  const cancel = form.querySelector('[data-expense-cancel]');
+  if (cancel) {
+    cancel.addEventListener('click', (event) => {
+      const disclosure = form.closest('details');
+      if (!disclosure) return;
+      event.preventDefault();
+      form.reset();
+      payment.dispatchEvent(new Event('change'));
+      form.elements.split?.dispatchEvent(new Event('change'));
+      disclosure.open = false;
+      disclosure.querySelector('summary').focus();
+    });
+  }
+
   const split = form.elements.split;
   if (!split) return;
   const groups = form.querySelectorAll('[data-expense-split]');

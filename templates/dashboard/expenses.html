@@ -47,6 +47,7 @@
             {% endif %}
         </section>
 
+        {% if show_shared_expenses %}
         <div class="trip-side-column">
             {% if trip.is_group_trip %}
             <section class="dashboard-section detail-section">
@@ -88,6 +89,7 @@
                     {% for name, balance in expense_rows %}<div><dt>{{ name }}</dt><dd>{{ balance|floatformat:2 }} {{ trip.currency }}</dd></div>{% endfor %}
                 </dl>
             </section>
-        </div>{% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>

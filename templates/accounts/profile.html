@@ -67,7 +67,7 @@
         <div class="form-grid">
             {% for field in about_form %}<div class="form-field{% if field.name == 'bio' %} full-field{% endif %}{% if field.field.disabled %} locked-field{% endif %}">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
         </div>
-        <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button>{% if about_form.has_missing %}<button class="button button-primary" type="submit">Save details</button>{% endif %}</div>
+        <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-primary" type="submit">Save details</button></div>
     </form>
 </dialog>
 {% endwith %}

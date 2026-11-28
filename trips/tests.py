@@ -67,6 +67,22 @@ class AdminPanelTests(TestCase):
         self.assertEqual((self.trip.owner, group.created_by, member.membership), (self.bob, self.bob, 'ORGANIZER'))
         self.assertTrue(Notification.objects.filter(user=self.bob, message__contains='bob is now the organizer').exists())
 
+    def test_edit_profile_and_verify_changed_email(self):
+        from accounts.forms import AboutMeForm
+        from accounts.models import Profile
+
+        profile, _ = Profile.objects.get_or_create(user=self.alice)
+        self.alice.first_name = 'Alice'
+        self.alice.save()
+        data = {'email': 'new@example.com', 'username': 'changed', 'first_name': ''}
+        form = AboutMeForm(data, user=self.alice, profile=profile)
+        self.assertIn('current_password', form.errors)
+        form = AboutMeForm(dict(data, current_password='Fjord!52Maple'), user=self.alice, profile=profile)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.alice.refresh_from_db()
+        self.assertEqual((self.alice.username, self.alice.email, self.alice.first_name), ('alice', data['email'], ''))
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

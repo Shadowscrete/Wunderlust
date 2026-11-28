@@ -25,8 +25,6 @@ class RegisterForm(UserCreationForm):
         return email
 
 class AboutMeForm(forms.Form):
-    """Fills in missing profile details. Anything already saved is locked (disabled),
-    so Django ignores any submitted value for it and keeps the stored one."""
     first_name = forms.CharField(max_length=150, required=False)
     last_name = forms.CharField(max_length=150, required=False)
     username = forms.CharField(required=False, disabled=True)
@@ -34,6 +32,9 @@ class AboutMeForm(forms.Form):
     location = forms.ChoiceField(choices=COUNTRY_CHOICES, required=False, label='Country')
     birth_date = forms.DateField(required=False, label='Birthday', widget=forms.DateInput(attrs={'type': 'date'}))
     bio = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 3, 'maxlength': 500}), max_length=500)
+
+    current_password = forms.CharField(required=False, strip=False, label='Current password (to change email)',
+                                       widget=forms.PasswordInput(attrs={'autocomplete': 'current-password'}))
 
     USER_FIELDS = ('first_name', 'last_name', 'username', 'email')
     PROFILE_FIELDS = ('location', 'birth_date', 'bio')
@@ -49,15 +50,14 @@ class AboutMeForm(forms.Form):
         # The date picker only offers past dates; clean_birth_date enforces it on the server too.
         yesterday = timezone.localdate() - timedelta(days=1)
         self.fields['birth_date'].widget.attrs.update({'max': yesterday.isoformat(), 'min': '1900-01-01'})
-        for name, field in self.fields.items():
-            # Country can always be changed; other saved details are locked (grayed out).
-            if initial.get(name) and name != 'location':
-                field.disabled = True
-                field.widget.attrs['class'] = 'is-locked'
+        self.fields['username'].widget.attrs['class'] = 'is-locked'
 
-    @property
-    def has_missing(self):
-        return any(not field.disabled for field in self.fields.values())
+    def clean_current_password(self):
+        password = self.cleaned_data.get('current_password')
+        if 'email' in self.cleaned_data and self.cleaned_data['email'] != self.user.email:
+            if not self.user.check_password(password):
+                raise forms.ValidationError('Enter your current password to change your email.')
+        return password
 
     def clean_birth_date(self):
         birth_date = self.cleaned_data.get('birth_date')
@@ -78,9 +78,7 @@ class AboutMeForm(forms.Form):
     def save(self):
         user_changed, profile_changed = [], []
         for name, value in self.cleaned_data.items():
-            if self.fields[name].disabled:
-                continue
-            if not value and name != 'location':
+            if name == 'current_password' or self.fields[name].disabled:
                 continue
             target, changed = (self.user, user_changed) if name in self.USER_FIELDS else (self.profile, profile_changed)
             setattr(target, name, value)

@@ -108,7 +108,7 @@ document.querySelectorAll('form[data-confirm]').forEach(function (form) {
                     var detail = document.createElement('small');
                     detail.className = 'flight-live-detail';
                     detail.textContent = side('Dep', st.departure) + '  →  ' + side('Arr', st.arrival);
-                    if (st.checked_at) detail.textContent += ' ? Checked ' + new Date(st.checked_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+                    if (st.checked_at) detail.textContent += ' · Checked ' + new Date(st.checked_at).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
                     box.append(badge, detail);
                 })
                 .catch(function () { msg.textContent = 'Live status unavailable right now.'; })

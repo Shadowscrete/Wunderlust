@@ -244,6 +244,11 @@ class PreparationAndItineraryTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(trip.itinerary_days.filter(date=end, title='', notes='').exists())
 
+    def test_active_flight_label(self):
+        from .flight_status import STATUS_LABELS
+
+        self.assertEqual(STATUS_LABELS['active'], 'Active — phase unconfirmed')
+
     def test_optional_items_can_be_removed_only_by_trip_travelers(self):
         trip = self.create_trip('Kyoto', 'Japan')
         mandatory = trip.checklist_items.filter(is_mandatory=True).first()

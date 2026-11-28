@@ -24,7 +24,7 @@ LIVE_WINDOW = timedelta(days=1)
 
 STATUS_LABELS = {
     'scheduled': 'Scheduled',
-    'active': 'Active ? phase unconfirmed',
+    'active': 'Active — phase unconfirmed',
     'departing': 'Departing',
     'boarding': 'Boarding',
     'taxiing': 'Taxiing',

@@ -249,6 +249,17 @@ class PreparationAndItineraryTests(TestCase):
 
         self.assertEqual(STATUS_LABELS['active'], 'Active — phase unconfirmed')
 
+    def test_private_avatars_and_bytecode_are_untracked(self):
+        import shutil
+        import subprocess
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        if not (root / '.git').exists() or not shutil.which('git'):
+            self.skipTest('Requires a Git checkout')
+        tracked = subprocess.check_output(['git', 'ls-files', '*.pyc', 'media/avatars/4/*.jpg'], cwd=root)
+        self.assertEqual(tracked, b'')
+
     def test_optional_items_can_be_removed_only_by_trip_travelers(self):
         trip = self.create_trip('Kyoto', 'Japan')
         mandatory = trip.checklist_items.filter(is_mandatory=True).first()

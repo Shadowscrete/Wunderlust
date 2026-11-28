@@ -24,6 +24,7 @@ urlpatterns = [
     path('travel-information/', views.travel_information_overview, name='travel_information_overview'),
     path('trips/new/', views.trip_create, name='trip_create'),
     path('trips/<int:trip_id>/', views.trip_detail, name='trip_detail'),
+    path('trips/<int:trip_id>/leave/', views.trip_leave, name='trip_leave'),
     path('trips/<int:trip_id>/edit/', views.trip_edit, name='trip_edit'),
     path('trips/<int:trip_id>/delete/', views.trip_delete, name='trip_delete'),
     path('trips/<int:trip_id>/flights/<int:flight_id>/status/', views.flight_status, name='flight_status'),

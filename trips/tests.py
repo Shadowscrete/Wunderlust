@@ -83,6 +83,23 @@ class AdminPanelTests(TestCase):
         self.alice.refresh_from_db()
         self.assertEqual((self.alice.username, self.alice.email, self.alice.first_name), ('alice', data['email'], ''))
 
+    def test_member_can_leave_and_rejoin(self):
+        from .models import ChecklistCheck, GroupTrip
+
+        group = GroupTrip.objects.create(trip=self.trip, created_by=self.alice)
+        group.members.create(user=self.bob)
+        item = self.trip.checklist_items.create(title='Passport')
+        ChecklistCheck.objects.create(item=item, user=self.bob)
+        self.login(self.bob)
+        url = reverse('trip_leave', args=[self.trip.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertRedirects(self.client.post(url), reverse('trip_list'))
+        self.assertFalse(group.members.filter(user=self.bob).exists())
+        self.assertFalse(ChecklistCheck.objects.filter(item=item, user=self.bob).exists())
+        self.assertTrue(Notification.objects.filter(user=self.alice, message='bob left the trip to Lisbon.').exists())
+        self.client.post(reverse('trip_join', args=[group.invite_code]))
+        self.assertTrue(group.members.filter(user=self.bob).exists())
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

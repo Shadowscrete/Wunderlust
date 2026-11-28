@@ -525,6 +525,23 @@ def trip_invite(request, trip_id):
 
 @role_required(User.Role.TRAVELER)
 @require_POST
+def trip_leave(request, trip_id):
+    trip = get_object_or_404(_accessible_trips(request.user), pk=trip_id)
+    if trip.owner_id == request.user.pk:
+        messages.error(request, 'The organizer cannot leave their trip.')
+        return redirect('trip_detail', trip_id=trip.pk)
+    with transaction.atomic():
+        member = get_object_or_404(GroupMember, group_trip__trip=trip, user=request.user)
+        ChecklistCheck.objects.filter(item__trip=trip, user=request.user).delete()
+        member.delete()
+        _notify_group(trip, 'A traveler left the group',
+                      f'{request.user.username} left the trip to {trip.destination}.', request.user.pk)
+        refresh_ready_status(trip)
+    return redirect('trip_list')
+
+
+@role_required(User.Role.TRAVELER)
+@require_POST
 def trip_remove_member(request, trip_id, user_id):
     """Only the trip's organizer (owner) can remove a traveler; the organizer can't remove themselves."""
     trip = _owned_trip(request, trip_id)

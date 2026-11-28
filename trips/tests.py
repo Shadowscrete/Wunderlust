@@ -100,6 +100,15 @@ class AdminPanelTests(TestCase):
         self.client.post(reverse('trip_join', args=[group.invite_code]))
         self.assertTrue(group.members.filter(user=self.bob).exists())
 
+    def test_member_removal_notifies_owner(self):
+        from .models import GroupTrip
+
+        GroupTrip.objects.create(trip=self.trip, created_by=self.alice).members.create(user=self.bob)
+        item = self.trip.checklist_items.create(title='Camera', is_custom=True)
+        self.login(self.bob)
+        self.client.post(reverse('checklist_remove', args=[item.pk]))
+        self.assertTrue(Notification.objects.filter(user=self.alice, message='bob removed Camera from the checklist.').exists())
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

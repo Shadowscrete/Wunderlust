@@ -369,6 +369,7 @@ def trip_detail(request, trip_id):
             flight = get_object_or_404(trip.flights, pk=_post_id(request, 'flight_id'))
             messages.success(request, f'Flight {flight.flight_number} removed.')
             flight.delete()
+            _notify_group(trip, 'Flight removed', f'{request.user.username} removed {flight.flight_number} from {trip.destination}.', request.user.pk)
             return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
         elif action == 'add_travel_info':
             travel_info_form = TripTravelInfoForm(request.POST, prefix='info')
@@ -412,6 +413,7 @@ def trip_detail(request, trip_id):
             else:
                 messages.success(request, f'{activity.title} was removed from the itinerary.')
                 activity.delete()
+                _notify_group(trip, 'Itinerary updated', f'{request.user.username} removed {activity.title} from the itinerary.', request.user.pk)
             return redirect('trip_detail', trip_id=trip.pk)
         elif action == 'add_itinerary_day':
             itinerary_day_form = ItineraryDayForm(trip, request.POST)
@@ -484,6 +486,7 @@ def checklist_remove(request, item_id):
     trip_id = item.trip_id
     item.delete()
     refresh_ready_status(item.trip)
+    _notify_group(item.trip, 'Preparation list updated', f'{request.user.username} removed {item.title} from the checklist.', request.user.pk)
     messages.success(request, f'{item.title} removed from the preparation list.')
     return redirect(f"{reverse('trip_detail', args=[trip_id])}#preparation")
 

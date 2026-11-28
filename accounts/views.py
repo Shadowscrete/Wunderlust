@@ -24,7 +24,8 @@ from .models import Profile, User
 from .security import clear_login_failures, login_locked, rate_limited, record_login_failure
 from trips.admin_views import notify_admins_of_report
 from trips.decorators import role_required
-from trips.models import Trip
+from trips.models import GroupMember, Trip
+from trips.views import _notify_group
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,19 @@ def profile(request):
     return render(request, 'accounts/profile.html', context)
 
 
+def _account_handovers(user, lock=False):
+    trips = Trip.objects.filter(owner=user).order_by('pk')
+    if lock:
+        trips = trips.select_for_update()
+    for trip in trips:
+        members = GroupMember.objects.filter(group_trip__trip=trip).exclude(user=user)
+        if lock:
+            members = members.select_for_update()
+        member = members.select_related('user', 'group_trip').order_by('joined_at', 'pk').first()
+        if member:
+            yield trip, member
+
+
 @login_required
 def account_settings(request):
     user = request.user
@@ -189,8 +203,20 @@ def account_settings(request):
         elif action == 'delete':
             delete_form = DeleteAccountForm(request.POST, user=user)
             if delete_form.is_valid():
+                with transaction.atomic():
+                    for trip, member in _account_handovers(user, lock=True):
+                        trip.owner = member.user
+                        trip.save(update_fields=['owner'])
+                        group = member.group_trip
+                        group.created_by = member.user
+                        group.save(update_fields=['created_by'])
+                        member.membership = GroupMember.Membership.ORGANIZER
+                        member.save(update_fields=['membership'])
+                        _notify_group(trip, 'New trip organizer',
+                                      f'{user.username} deleted their account. {member.user.username} is now the organizer of {trip.destination}.',
+                                      user.pk)
+                    user.delete()
                 logout(request)
-                user.delete()
                 return redirect('home')
 
     for field in password_form.fields.values():
@@ -201,6 +227,7 @@ def account_settings(request):
         'notification_form': notification_form,
         'password_form': password_form,
         'delete_form': delete_form,
+        'handovers': [] if is_admin else _account_handovers(user),
         'devices': devices,
         'other_device_count': sum(1 for d in devices if not d['is_current']),
         'is_admin': is_admin,

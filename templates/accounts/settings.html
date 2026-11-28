@@ -61,14 +61,15 @@
     </section>
 
     {% if not is_admin %}<section class="dashboard-section settings-card danger-card">
-        <div class="settings-card-intro"><h2>Delete account</h2><p>Permanently removes your account, your trips and everything in them. This can’t be undone.</p></div>
+        <div class="settings-card-intro"><h2>Delete account</h2><p>Permanently removes your account and trips with no remaining members. This can’t be undone.</p></div>
+        {% for trip, member in handovers %}<p>{{ member.user.username }} will organize {{ trip.destination }}.</p>{% endfor %}
         <div class="settings-actions"><button class="button button-danger" type="button" data-dialog-open="delete-dialog">Delete account…</button></div>
     </section>{% endif %}
 </div>
 
 {% if not is_admin %}<dialog class="modal" id="delete-dialog" aria-labelledby="delete-dialog-title"{% if delete_form.errors %} data-open-on-load{% endif %}>
     <form method="post" class="modal-body">{% csrf_token %}<input type="hidden" name="action" value="delete">
-        <div class="modal-head"><div><h2 id="delete-dialog-title">Delete your account?</h2><p>Your trips, checklists and itineraries will be permanently deleted.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
+        <div class="modal-head"><div><h2 id="delete-dialog-title">Delete your account?</h2><p>Trips with other members will pass to their next organizer.</p></div><button class="modal-close" type="button" data-dialog-close aria-label="Close">×</button></div>
         {% for field in delete_form %}<div class="form-field">{{ field.label_tag }}{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
         <div class="modal-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-danger" type="submit">Delete permanently</button></div>
     </form>

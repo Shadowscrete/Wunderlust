@@ -54,6 +54,19 @@ class AdminPanelTests(TestCase):
         self.client.post(reverse('account_settings'), {'action': 'delete'})
         self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
 
+    def test_account_deletion_transfers_shared_trip(self):
+        from .models import GroupTrip
+
+        group = GroupTrip.objects.create(trip=self.trip, created_by=self.alice)
+        member = group.members.create(user=self.bob)
+        self.login(self.alice)
+        self.assertContains(self.client.get(reverse('account_settings')), 'bob will organize Lisbon')
+        self.client.post(reverse('account_settings'), {'action': 'delete', 'password': 'Fjord!52Maple'})
+        for obj in (self.trip, group, member):
+            obj.refresh_from_db()
+        self.assertEqual((self.trip.owner, group.created_by, member.membership), (self.bob, self.bob, 'ORGANIZER'))
+        self.assertTrue(Notification.objects.filter(user=self.bob, message__contains='bob is now the organizer').exists())
+
     def test_report_notifies_admin_and_counts_show(self):
         self.login(self.bob)
         self.client.post(reverse('report_user', args=['alice']), {'reason': Report.Reason.HARASSMENT, 'details': 'rude'})

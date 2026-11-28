@@ -108,6 +108,12 @@ class CustomChecklistForm(forms.ModelForm):
         widgets = {'quantity': forms.NumberInput(attrs={'min': 1, 'step': 1})}
 
 
+class ChecklistRenameForm(forms.ModelForm):
+    class Meta:
+        model = Checklist
+        fields = ('title',)
+
+
 class ChecklistQuantityForm(forms.ModelForm):
     MAX_QUANTITY = 999
 

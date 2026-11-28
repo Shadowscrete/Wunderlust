@@ -124,6 +124,19 @@ class AdminPanelTests(TestCase):
         day.refresh_from_db()
         self.assertEqual((day.title, day.notes, day.date), ('Arrival', 'Pack light', self.trip.start_date))
 
+    def test_only_custom_nonmandatory_items_can_be_renamed(self):
+        custom = self.trip.checklist_items.create(title='Camera', is_custom=True)
+        required = self.trip.checklist_items.create(title='Passport', is_mandatory=True, is_document=True)
+        self.login(self.alice)
+        url = reverse('trip_detail', args=[self.trip.pk])
+        for item, status in ((custom, 302), (required, 404)):
+            response = self.client.post(url, {'action': 'rename_checklist_item', 'item_id': item.pk,
+                                              f'checklist-{item.pk}-title': 'New name'})
+            self.assertEqual(response.status_code, status)
+        custom.refresh_from_db()
+        required.refresh_from_db()
+        self.assertEqual((custom.title, required.title), ('New name', 'Passport'))
+
     def test_member_can_leave_and_rejoin(self):
         from .models import ChecklistCheck, GroupTrip
 

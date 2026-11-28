@@ -15,7 +15,7 @@ from accounts.context_processors import get_user_prefs
 from accounts.models import Profile
 
 from .decorators import role_required
-from .forms import ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
+from .forms import ChecklistRenameForm, ItineraryDayEditForm, ActivityForm, FlightForm, TripEditForm, ChecklistQuantityForm, CustomChecklistForm, ItineraryDayForm, TripForm, TripTravelInfoForm
 from .models import NotificationRead
 from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, GroupTrip, ItineraryDay, Notification, RemovedMember, TravelInfo, Trip, TripPlace
 from .trends import CITIES, destination_trends
@@ -385,6 +385,15 @@ def trip_detail(request, trip_id):
                 _notify_group(trip, 'Travel information updated', f'{info.title} was added to {trip.destination}.', request.user.pk)
                 messages.success(request, 'Travel information saved.')
                 return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#travel-info")
+        elif action == 'rename_checklist_item':
+            item = get_object_or_404(trip.checklist_items, pk=_post_id(request, 'item_id'), is_custom=True, is_mandatory=False)
+            form = ChecklistRenameForm(request.POST, instance=item, prefix=f'checklist-{item.pk}')
+            if form.is_valid():
+                form.save(commit=False).save(update_fields=['title'])
+                _notify_group(trip, 'Preparation list updated', f'{request.user.username} renamed a checklist item to {item.title}.', request.user.pk)
+                return redirect(f"{reverse('trip_detail', args=[trip.pk])}#preparation")
+            bound_edit = form
+            active_tab = 'preparation'
         elif action == 'add_checklist_item':
             checklist_form = CustomChecklistForm(request.POST, prefix='item')
             active_tab = 'preparation'
@@ -459,6 +468,10 @@ def trip_detail(request, trip_id):
             prefix = f'activity-{activity.pk}'
             activity.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ActivityForm(instance=activity, prefix=prefix)
         day.activity_form = activity_form if day.pk == submitted_day_id else ActivityForm(auto_id=f'id_day{day.pk}_%s')
+    for item in [*documents, *essentials]:
+        if item.is_custom and not item.is_mandatory:
+            prefix = f'checklist-{item.pk}'
+            item.edit_form = bound_edit if bound_edit and bound_edit.prefix == prefix else ChecklistRenameForm(instance=item, prefix=prefix)
     travelers = _readiness_rows(trip, request.user)
     group_trip = getattr(trip, 'group_trip', None)
     flights = list(trip.flights.all())

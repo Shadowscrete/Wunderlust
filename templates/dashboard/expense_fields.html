@@ -1,0 +1,6 @@
+<form class="feature-form compact-form" method="post" action="{% if expense %}{% url 'expense_edit' trip.pk expense.pk %}{% else %}{% url 'expense_add' trip.pk %}{% endif %}">
+    {% csrf_token %}
+    <p>For an equal split, select travelers. For exact amounts, fill in each traveler?s share in {{ trip.currency }}.</p>
+    {{ form.as_div }}
+    <button class="button button-primary" type="submit">Save expense</button>
+</form>

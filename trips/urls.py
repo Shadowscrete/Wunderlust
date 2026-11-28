@@ -1,7 +1,10 @@
 from django.urls import path
-from . import admin_views, views
+from . import admin_views, expense_views, views
 
 urlpatterns = [
+    path('trips/<int:trip_id>/expenses/add/', expense_views.expense_save, name='expense_add'),
+    path('trips/<int:trip_id>/expenses/<int:expense_id>/edit/', expense_views.expense_save, name='expense_edit'),
+    path('trips/<int:trip_id>/expenses/<int:expense_id>/delete/', expense_views.expense_delete, name='expense_delete'),
     path('', views.dashboard_home, name='dashboard_home'),
     path('traveler/', views.traveler_dashboard, name='traveler_dashboard'),
     path('walkthrough/dismiss/', views.dismiss_walkthrough, name='dismiss_walkthrough'),

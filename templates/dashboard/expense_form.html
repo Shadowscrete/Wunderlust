@@ -1,0 +1,6 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+<h1>{% if expense %}Edit expense{% else %}Add expense{% endif %}</h1>
+<p><a href="{% url 'trip_detail' trip.pk %}?tab=expenses#panel-expenses">Back to {{ trip.destination }}</a></p>
+{% include "dashboard/expense_fields.html" %}
+{% endblock %}

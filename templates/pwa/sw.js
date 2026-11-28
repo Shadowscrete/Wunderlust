@@ -21,6 +21,7 @@ const isCacheablePage = (url) =>
   !url.pathname.startsWith('/dashboard/admin/') &&
   !url.pathname.startsWith('/dashboard/notifications/') &&
   !url.pathname.startsWith('/dashboard/join/') &&
+  !/\/expenses\//.test(url.pathname) &&
   !/\/(status|toggle|quantity|delete|leave|remove|invite|reset|read)\/?$/.test(url.pathname);
 
 self.addEventListener('install', (event) => {

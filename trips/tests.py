@@ -583,3 +583,57 @@ class ExchangeRateTests(TestCase):
                 self.assertEqual(exchange_rate('USD', 'USD'), 1)
             self.assertEqual(fetch.call_count, 2)
             self.assertEqual(fetch.call_args.kwargs['timeout'], 5)
+
+
+class ExpenseFlowTests(TestCase):
+    def setUp(self):
+        from .models import GroupTrip
+
+        self.owner = User.objects.create_user('payer')
+        self.member = User.objects.create_user('companion')
+        self.outsider = User.objects.create_user('outsider')
+        today = timezone.localdate()
+        self.trip = Trip.objects.create(owner=self.owner, destination='Oslo', start_date=today, end_date=today)
+        self.group = GroupTrip.objects.create(trip=self.trip, created_by=self.owner)
+        self.group.members.create(user=self.member)
+        self.data = {'paid_by': self.owner.pk, 'title': 'Lunch', 'amount': '10.01',
+                     'currency': 'USD', 'spent_on': today, 'split': 'equal',
+                     'travelers': [self.member.pk, self.owner.pk]}
+
+    def test_expense_permissions_and_splits(self):
+        from decimal import Decimal
+
+        url = reverse('expense_add', args=[self.trip.pk])
+        self.client.force_login(self.outsider)
+        self.assertEqual(self.client.post(url, self.data).status_code, 404)
+        self.client.force_login(self.member)
+        self.assertContains(self.client.post(url, dict(self.data, split='exact')), 'Exact shares must add up')
+        self.assertEqual(self.client.post(url, self.data).status_code, 302)
+        expense = self.trip.expenses.get()
+        self.assertEqual(dict(expense.shares.values_list('user_id', 'amount_in_trip_currency')),
+                         {self.owner.pk: Decimal('5.01'), self.member.pk: Decimal('5.00')})
+        edit = reverse('expense_edit', args=[self.trip.pk, expense.pk])
+        self.assertEqual(self.client.post(edit, self.data).status_code, 404)
+        self.client.force_login(self.owner)
+        exact = dict(self.data, split='exact', **{f'exact_{self.member.pk}': '10.01'})
+        self.assertEqual(self.client.post(edit, exact).status_code, 302)
+        self.assertEqual(expense.shares.get().user, self.member)
+        self.assertEqual(self.client.post(reverse('expense_delete', args=[self.trip.pk, expense.pk])).status_code, 302)
+        self.assertFalse(self.trip.expenses.exists())
+
+    def test_manual_rate_fallback_and_saved_rate(self):
+        from unittest.mock import patch
+
+        cache.clear()
+        self.client.force_login(self.owner)
+        url = reverse('expense_add', args=[self.trip.pk])
+        data = dict(self.data, currency='EUR')
+        with patch('trips.fx.urlopen', side_effect=TimeoutError) as fetch:
+            self.assertContains(self.client.post(url, data), 'enter the rate manually')
+            self.assertEqual(self.client.post(url, dict(data, manual_rate='2')).status_code, 302)
+            expense = self.trip.expenses.get()
+            edit = reverse('expense_edit', args=[self.trip.pk, expense.pk])
+            self.assertEqual(self.client.post(edit, dict(data, amount='15')).status_code, 302)
+            self.assertEqual(fetch.call_count, 2)
+        expense.refresh_from_db()
+        self.assertEqual(expense.amount_in_trip_currency, 30)

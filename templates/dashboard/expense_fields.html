@@ -6,7 +6,7 @@
         <div class="expense-field-wide" data-expense-other>
             {% include "dashboard/expense_field.html" with field=form.title %}
         </div>
-        {% include "dashboard/expense_field.html" with field=form.paid_by %}
+        {% if not form.is_solo %}{% include "dashboard/expense_field.html" with field=form.paid_by %}{% endif %}
         {% include "dashboard/expense_field.html" with field=form.spent_on %}
         {% include "dashboard/expense_field.html" with field=form.amount %}
         {% include "dashboard/expense_field.html" with field=form.currency %}
@@ -34,6 +34,7 @@
     </fieldset>
     {% endif %}
     <div class="expense-form-actions">
+        <a class="button button-secondary" href="{% url 'trip_detail' trip.pk %}?tab=expenses#panel-expenses"{% if inline_expense %} data-expense-cancel{% endif %}>Cancel</a>
         <button class="button button-primary" type="submit">Save expense</button>
     </div>
 </form>

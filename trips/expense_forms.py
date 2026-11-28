@@ -54,7 +54,9 @@ class ExpenseForm(forms.ModelForm):
         self.fields['paid_by'] = forms.TypedChoiceField(
             label='Paid by', choices=[(pk, user.username) for pk, user in people.items()], coerce=int,
         )
-        if not self.is_solo:
+        if self.is_solo:
+            self.fields['paid_by'].disabled = True
+        else:
             self.fields['travelers'].choices = self.fields['paid_by'].choices
         self.fields['currency'].choices = currency_choices(trip.currency, self.instance.currency)
         self.initial.update({'paid_by': self.instance.paid_by_id or viewer.pk,

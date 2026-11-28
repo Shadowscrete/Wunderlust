@@ -2,31 +2,31 @@
 <div class="trip-panel" role="tabpanel" id="panel-expenses" aria-labelledby="tab-expenses" data-panel="expenses">
     <section class="dashboard-section detail-section expense-overview">
         <div class="section-heading"><h2>Expenses</h2><a class="button button-secondary button-small" href="{% url 'expense_csv' trip.pk %}">Download CSV</a></div>
-        <dl class="expense-totals">
+        <dl class="expense-totals{% if not show_shared_expenses %} expense-totals-solo{% endif %}">
             <div><dt>Total spent</dt><dd>{{ expense_total|floatformat:2 }} {{ trip.currency }}</dd></div>
-            <div><dt>{% if expense_balance < 0 %}You owe{% elif expense_balance > 0 %}You’re owed{% else %}Your balance{% endif %}</dt><dd>{{ expense_balance_magnitude|floatformat:2 }} {{ trip.currency }}</dd></div>
+            {% if show_shared_expenses %}<div><dt>{% if expense_balance < 0 %}You owe{% elif expense_balance > 0 %}You’re owed{% else %}Your balance{% endif %}</dt><dd>{{ expense_balance_magnitude|floatformat:2 }} {{ trip.currency }}</dd></div>{% endif %}
         </dl>
         <details class="expense-disclosure">
             <summary class="button button-primary">Add expense</summary>
-            {% include "dashboard/expense_fields.html" with form=expense_form %}
+            {% include "dashboard/expense_fields.html" with form=expense_form inline_expense=True %}
         </details>
     </section>
 
-    <div class="trip-detail-grid expense-grid">
+    <div class="{% if show_shared_expenses %}trip-detail-grid {% endif %}expense-grid">
         <section class="dashboard-section detail-section">
             <div class="section-heading"><h2>Expense history</h2></div>
             {% for entry in expense_page %}
                 <details class="expense-entry">
                     <summary class="expense-row">
-                        <span><strong>{{ entry.title }}</strong><small>{{ entry.payer_label }} paid · {{ entry.spent_on|date:"M j, Y" }}</small></span>
+                        <span><strong>{{ entry.title }}</strong><small>{% if show_shared_expenses %}{{ entry.payer_label }} paid &middot; {% endif %}{{ entry.spent_on|date:"M j, Y" }}</small></span>
                         <strong class="expense-amount">{{ entry.amount_in_trip_currency|floatformat:2 }} {{ trip.currency }}</strong>
                     </summary>
                     <div class="expense-entry-body">
                         {% if entry.currency != trip.currency %}<p>Original amount {{ entry.amount|floatformat:2 }} {{ entry.currency }}</p>{% endif %}
                         {% if entry.notes %}<p>{{ entry.notes|linebreaksbr }}</p>{% endif %}
-                        <dl class="expense-breakdown" aria-label="Expense split">
+                        {% if show_shared_expenses %}<dl class="expense-breakdown" aria-label="Expense split">
                             {% for name, amount in entry.split_rows %}<div><dt>{{ name }}</dt><dd>{{ amount|floatformat:2 }} {{ trip.currency }}</dd></div>{% endfor %}
-                        </dl>
+                        </dl>{% endif %}
                         {% if request.user.pk == trip.owner_id or request.user.pk == entry.paid_by_id %}
                             <div class="expense-actions">
                                 <a class="button button-secondary button-small" href="{% url 'expense_edit' trip.pk entry.pk %}">Edit expense</a>
@@ -47,7 +47,7 @@
             {% endif %}
         </section>
 
-        <div class="trip-side-column">
+        {% if show_shared_expenses %}<div class="trip-side-column">
             <section class="dashboard-section detail-section">
                 <div class="section-heading"><h2>Who owes whom</h2></div>
                 {% for transfer in transfers %}
@@ -86,6 +86,6 @@
                     {% for name, balance in expense_rows %}<div><dt>{{ name }}</dt><dd>{{ balance|floatformat:2 }} {{ trip.currency }}</dd></div>{% endfor %}
                 </dl>
             </section>
-        </div>
+        </div>{% endif %}
     </div>
 </div>

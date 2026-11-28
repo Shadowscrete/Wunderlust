@@ -79,9 +79,14 @@ class DestinationCurrencyTests(TestCase):
         self.assertContains(page, '<option value="JPY" selected>')
         self.assertContains(page, '<option value="XCG">')
         self.assertNotContains(page, 'name="manual_rate"')
+        self.assertNotContains(page, 'name="paid_by"')
         self.assertNotContains(page, 'name="split"')
+        detail = self.client.get(reverse('trip_detail', args=[trip.pk]))
+        self.assertNotContains(detail, 'Who owes whom')
+        self.assertNotContains(detail, 'Traveler balances')
+        self.assertContains(detail, 'data-expense-cancel')
         self.assertNotContains(page, 'name="travelers"')
-        data = {'payment_type': 'Other', 'title': 'Luggage locker', 'paid_by': owner.pk,
+        data = {'payment_type': 'Other', 'title': 'Luggage locker',
                 'amount': '1000', 'currency': 'JPY', 'spent_on': date}
         with patch('trips.expense_forms.exchange_rate', return_value=Decimal('0.0065')):
             self.assertEqual(self.client.post(url, data).status_code, 302)

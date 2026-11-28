@@ -16,6 +16,11 @@
         {% include 'dashboard/admin/_column_chart.html' with series=stats.signups label='New accounts per month' %}</section>
     <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">LAST 6 MONTHS</p><h2>Trips created</h2></div></div>
         {% include 'dashboard/admin/_column_chart.html' with series=stats.trips_created label='Trips created per month' %}</section>
+    <section class="dashboard-section admin-section">
+        <div class="section-heading"><h2>How travelers heard about us</h2></div>
+        {% if stats.referral_responses %}<p class="empty-inline">{{ stats.referral_responses }} response{{ stats.referral_responses|pluralize }}</p>{% endif %}
+        {% include 'dashboard/admin/_bar_list.html' with rows=stats.referral_sources empty='No referral responses yet.' %}
+    </section>
     <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">ALL TIME</p><h2>Popular destinations</h2></div></div>
         {% include 'dashboard/admin/_bar_list.html' with rows=stats.destinations empty='No trips yet.' %}</section>
     <section class="dashboard-section admin-section"><div class="section-heading"><div><p class="eyebrow">ALL TRIPS</p><h2>Trip status</h2></div></div>

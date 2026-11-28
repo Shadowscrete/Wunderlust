@@ -20,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from accounts.models import Report, UserSession
+from accounts.models import Profile, Report, UserSession
 from accounts.sessions import end_session
 from accounts.social import avatar_url_for, initials_for
 
@@ -123,7 +123,17 @@ def _analytics():
                    for r in Report.objects.filter(status=Report.Status.OPEN).values('reason').annotate(total=Count('pk')).order_by('-total')]
     destination_rows = [{'label': f"{r['destination']}{', ' + r['country'] if r['country'] else ''}", 'total': r['total']}
                         for r in Trip.objects.values('destination', 'country').annotate(total=Count('pk')).order_by('-total', 'destination')[:6]]
+    sources = list(Profile.objects.filter(user__role=User.Role.TRAVELER).exclude(referral_source='')
+                   .values('referral_source').annotate(total=Count('pk')).order_by('-total', 'referral_source'))
+    response_count = sum(row['total'] for row in sources)
+    source_labels = dict(Profile.ReferralSource.choices)
     data = {
+        'referral_sources': [
+            {'label': source_labels[row['referral_source']], 'value': row['total'],
+             'pct': round(row['total'] * 100 / response_count)}
+            for row in sources
+        ],
+        'referral_responses': response_count,
         'users': user_counts,
         'trips': trip_counts,
         'completion_rate': round(done * 100 / total) if total else 0,

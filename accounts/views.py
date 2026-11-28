@@ -18,11 +18,11 @@ from django.views.decorators.http import require_POST
 from .context_processors import clear_user_prefs
 from .sessions import active_devices, end_session, sign_out_other_sessions
 from .models import Follow, Report, UserSession
-from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, RegisterForm, ReportForm
+from .forms import AboutMeForm, AppearanceForm, AvatarForm, DeleteAccountForm, NotificationPrefsForm, ProfileSetupForm, RegisterForm, ReportForm
 from .social import avatar_url_for, connection_sets, discoverable_users, initials_for, notify_follow, relationship
 from .models import Profile, User
 from .security import clear_login_failures, login_locked, rate_limited, record_login_failure
-from trips.admin_views import notify_admins_of_report
+from trips.admin_views import invalidate_analytics, notify_admins_of_report
 from trips.decorators import role_required
 from trips.models import GroupMember, Trip
 from trips.views import _notify_group
@@ -89,11 +89,11 @@ def register(request):
             user.role = user.Role.TRAVELER
             user.save(update_fields=['role'])
             login(request, user)
-            # Came from a trip invite link? Go straight back to it after signing up.
             next_url = request.POST.get('next', '')
-            if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
-                return redirect(next_url)
-            return redirect('traveler_dashboard')
+            if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+                next_url = ''
+            request.session['profile_setup_next'] = next_url
+            return redirect('profile_setup')
     else:
         form = RegisterForm()
 
@@ -105,6 +105,77 @@ def login_success(request):
     if request.user.role == request.user.Role.ADMINISTRATOR:
         return redirect('admin_dashboard')
     return redirect('traveler_dashboard')
+
+
+PROFILE_SETUP_QUESTIONS = (
+    ('first_name', 'What is your first name?'),
+    ('last_name', 'What is your last name?'),
+    ('location', 'Which country do you live in?'),
+    ('birth_date', 'When is your birthday?'),
+    ('referral_source', 'Where did you hear about us?'),
+)
+
+
+@role_required(User.Role.TRAVELER)
+def profile_setup(request):
+    next_url = request.session.get('profile_setup_next')
+    if next_url is None:
+        return redirect('traveler_dashboard')
+
+    user = request.user
+    details = Profile.objects.filter(user=user).first() or Profile(user=user)
+    index = request.session.get('profile_setup_step', 0)
+    answers = request.session.get('profile_setup_answers', {})
+    birthday_step = next(i for i, (field, _) in enumerate(PROFILE_SETUP_QUESTIONS) if field == 'birth_date')
+    if index > birthday_step and not answers.get('birth_date'):
+        request.session['profile_setup_step'] = birthday_step
+        return redirect('profile_setup')
+    name, question = PROFILE_SETUP_QUESTIONS[index]
+    can_skip = name != 'birth_date'
+    last_step = index == len(PROFILE_SETUP_QUESTIONS) - 1
+    form = ProfileSetupForm(user=user, profile=details)
+    form.fields['birth_date'].required = not can_skip
+    if name in answers:
+        form.initial[name] = answers[name]
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'back' and index:
+            request.session['profile_setup_step'] = index - 1
+            return redirect('profile_setup')
+        if request.POST.get('question') != name:
+            return redirect('profile_setup')
+
+        value = '' if action == 'skip' else request.POST.get(name, '')
+        form = ProfileSetupForm({**answers, name: value}, user=user, profile=details)
+        form.fields['birth_date'].required = index >= birthday_step
+        is_valid = form.is_valid()
+        if index > birthday_step and 'birth_date' in form.errors:
+            request.session['profile_setup_step'] = birthday_step
+            return redirect('profile_setup')
+        if is_valid:
+            answers[name] = value
+            if last_step:
+                with transaction.atomic():
+                    form.save()
+                clear_user_prefs(user.pk)
+                if form.cleaned_data['referral_source']:
+                    invalidate_analytics()
+                return _finish_profile_setup(request, next_url)
+            request.session['profile_setup_answers'] = answers
+            request.session['profile_setup_step'] = index + 1
+            return redirect('profile_setup')
+
+    return render(request, 'accounts/profile_setup.html', {
+        'field': form[name], 'question': question, 'step': index + 1,
+        'total_steps': len(PROFILE_SETUP_QUESTIONS), 'last_step': last_step, 'can_skip': can_skip,
+    })
+
+
+def _finish_profile_setup(request, next_url):
+    for key in ('profile_setup_next', 'profile_setup_step', 'profile_setup_answers'):
+        request.session.pop(key, None)
+    return redirect(next_url or 'traveler_dashboard')
 
 
 @login_required

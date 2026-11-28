@@ -29,7 +29,7 @@ class AuthenticationLandingTests(TestCase):
             'username': 'new-traveler', 'email': 'new-traveler@example.com',
             'password1': PASSWORD, 'password2': PASSWORD,
         })
-        self.assertRedirects(response, reverse('traveler_dashboard'))
+        self.assertRedirects(response, reverse('profile_setup'))
         user = User.objects.get(username='new-traveler')
         self.assertIsNotNone(user.created_at)
         self.assertIsNotNone(user.updated_at)
@@ -40,14 +40,90 @@ class AuthenticationLandingTests(TestCase):
             'username': 'invitee', 'email': 'invitee@example.com',
             'password1': PASSWORD, 'password2': PASSWORD, 'next': invite,
         })
+        self.assertRedirects(response, reverse('profile_setup'))
+        response = self.finish_setup_by_skipping_optional_questions()
         self.assertEqual(response['Location'], invite)
+        self.assertEqual(User.objects.get(username='invitee').first_name, '')
 
     def test_registration_ignores_offsite_next(self):
         response = self.client.post(reverse('register'), {
             'username': 'invitee2', 'email': 'invitee2@example.com',
             'password1': PASSWORD, 'password2': PASSWORD, 'next': 'https://evil.example/',
         })
-        self.assertRedirects(response, reverse('traveler_dashboard'))
+        self.assertRedirects(response, reverse('profile_setup'))
+        self.assertRedirects(self.finish_setup_by_skipping_optional_questions(), reverse('traveler_dashboard'))
+
+    def finish_setup_by_skipping_optional_questions(self):
+        setup = reverse('profile_setup')
+        for name in ('first_name', 'last_name', 'location'):
+            self.assertRedirects(self.client.post(setup, {'action': 'skip', 'question': name, name: 'Discarded'}), setup)
+        birthday = self.client.get(setup)
+        self.assertNotContains(birthday, 'value="skip"')
+        self.assertContains(birthday, 'name="birth_date"')
+        bypass = self.client.post(setup, {'action': 'skip', 'question': 'birth_date'})
+        self.assertContains(bypass, 'This field is required.')
+        self.assertRedirects(self.client.post(setup, {'question': 'birth_date', 'birth_date': '2000-01-01'}), setup)
+        return self.client.post(setup, {'action': 'skip', 'question': 'referral_source'})
+
+    def test_setup_saves_optional_details_and_does_not_run_again(self):
+        from .models import Profile
+
+        self.client.post(reverse('register'), {
+            'username': 'profile-setup', 'email': 'setup@example.com',
+            'password1': PASSWORD, 'password2': PASSWORD,
+        })
+        setup = reverse('profile_setup')
+        page = self.client.get(setup)
+        self.assertContains(page, '1 of 5')
+        self.assertNotContains(page, 'name="last_name"')
+        self.assertNotContains(page, 'name="email"')
+        answers = (
+            ('first_name', 'Ava'), ('last_name', 'Reyes'), ('location', 'Philippines'),
+            ('birth_date', '2000-02-29'), ('referral_source', 'social'),
+        )
+        for name, value in answers:
+            self.assertContains(self.client.get(setup), f'name="{name}"')
+            if name == 'birth_date':
+                bad = self.client.post(setup, {'question': name, name: '2999-01-01'})
+                self.assertContains(bad, 'Your birthday must be a date in the past.')
+                self.assertContains(bad, 'class="setup-error-popup" role="alert" data-setup-error>')
+                from datetime import timedelta
+
+                from django.utils import timezone
+
+                today = timezone.localdate()
+                birthday_page = self.client.get(setup)
+                cutoff = birthday_page.context['field'].form.latest_birth_date
+                self.assertContains(birthday_page, f'max="{cutoff.isoformat()}"')
+                for rejected in (today, today + timedelta(days=1), cutoff + timedelta(days=1)):
+                    bad = self.client.post(setup, {'question': name, name: rejected.isoformat()})
+                    self.assertContains(bad, 'Step 4 of 5')
+                boundary = self.client.post(setup, {'question': name, name: cutoff.isoformat()})
+                self.assertRedirects(boundary, setup)
+                self.assertContains(self.client.get(setup), 'Step 5 of 5')
+                self.assertRedirects(self.client.post(setup, {'action': 'back'}), setup)
+                for impossible_date in ('2001-02-29', '2000-02-30', '2000-04-31', '2000-13-01'):
+                    bad = self.client.post(setup, {'question': name, name: impossible_date})
+                    self.assertContains(bad, 'Enter a valid date.')
+                    self.assertContains(bad, 'Step 4 of 5')
+                bad = self.client.post(setup, {'question': name, name: '01/02/2000'})
+                self.assertContains(bad, 'Enter a valid date in YYYY-MM-DD format.')
+            if name == 'last_name':
+                self.assertRedirects(self.client.post(setup, {'action': 'back'}), setup)
+                self.assertContains(self.client.get(setup), 'value="Ava"')
+                self.client.post(setup, {'question': 'first_name', 'first_name': 'Ava'})
+            response = self.client.post(setup, {'question': name, name: value, 'email': 'changed@example.com'})
+            self.assertRedirects(response, reverse('traveler_dashboard') if name == 'referral_source' else setup)
+        user = User.objects.get(username='profile-setup')
+        details = Profile.objects.get(user=user)
+        self.assertEqual((user.first_name, user.last_name, user.email), ('Ava', 'Reyes', 'setup@example.com'))
+        self.assertEqual((details.location, details.birth_date.isoformat(), details.referral_source),
+                         ('Philippines', '2000-02-29', 'social'))
+        self.assertRedirects(self.client.get(setup), reverse('traveler_dashboard'))
+
+    def test_existing_users_do_not_enter_setup(self):
+        self.client.force_login(self.user)
+        self.assertRedirects(self.client.get(reverse('profile_setup')), reverse('traveler_dashboard'))
 
 
 class LoginProtectionTests(TestCase):
@@ -109,3 +185,22 @@ class LogoutTests(TestCase):
         self.client.force_login(user)
         response = self.client.post(reverse('logout'))
         self.assertIn('storage', response['Clear-Site-Data'])
+
+
+class ReferralAnalyticsTests(TestCase):
+    def test_admin_sources_are_ranked_and_unanswered_profiles_are_excluded(self):
+        from .models import Profile
+
+        cache.clear()
+        admin = User.objects.create_superuser('source-admin', password=PASSWORD)
+        for index, source in enumerate(('social', 'social', 'search', '')):
+            user = User.objects.create_user(f'referral-{index}')
+            Profile.objects.create(user=user, referral_source=source)
+        self.client.force_login(admin)
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertContains(response, 'How travelers heard about us')
+        self.assertEqual(response.context['stats']['referral_responses'], 3)
+        self.assertEqual(response.context['stats']['referral_sources'], [
+            {'label': 'Social media', 'value': 2, 'pct': 67},
+            {'label': 'Search engine', 'value': 1, 'pct': 33},
+        ])

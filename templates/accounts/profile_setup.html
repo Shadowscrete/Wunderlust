@@ -1,0 +1,43 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set up your profile | Wunderlust</title>
+    <link rel="stylesheet" href="{% static 'registration/auth.css' %}?v=4">
+    <link rel="stylesheet" href="{% static 'registration/profile-setup.css' %}?v=2">
+</head>
+<body class="auth-body">
+    <main class="auth-layout auth-layout-register" aria-labelledby="setup-title">
+        <div class="auth-visual" aria-hidden="true">
+            <img src="{% static 'home/assets/beach-aerial.jpg' %}" width="1775" height="2200" alt="">
+            <div class="auth-visual-shade"></div>
+        </div>
+        <section class="auth-panel">
+            <div class="auth-panel-top"><span class="auth-wordmark">Wunderlust</span></div>
+            <div class="auth-content auth-content-register profile-setup">
+                <p class="auth-eyebrow">Step {{ step }} of {{ total_steps }}</p>
+                <progress value="{{ step }}" max="{{ total_steps }}" aria-label="Profile setup progress"></progress>
+                <h1 id="setup-title">{{ question }}</h1>
+                <form method="post" class="auth-form" data-profile-setup>
+                    {% csrf_token %}
+                    <input type="hidden" name="question" value="{{ field.name }}">
+                    <div class="field-row{% if field.errors %} has-error{% endif %}">
+                        {{ field.label_tag }}{{ field }}
+                        <div id="{{ field.auto_id }}_error" class="setup-error-popup" role="alert" data-setup-error{% if not field.errors %} hidden{% endif %}>
+                            {% for error in field.errors %}<p>{{ error }}</p>{% endfor %}
+                        </div>
+                    </div>
+                    <div class="profile-setup-actions">
+                        <button class="submit-button" type="submit">{% if last_step %}Save profile{% else %}Continue{% endif %}</button>
+                        {% if step > 1 %}<button class="setup-secondary" type="submit" name="action" value="back" formnovalidate>Back</button>{% endif %}
+                    </div>
+                    {% if can_skip %}<button class="setup-skip" type="submit" name="action" value="skip" formnovalidate>Skip</button>{% endif %}
+                </form>
+            </div>
+        </section>
+    </main>
+    <script src="{% static 'registration/profile-setup.js' %}" defer></script>
+</body>
+</html>

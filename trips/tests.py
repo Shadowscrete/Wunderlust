@@ -186,6 +186,17 @@ class PreparationAndItineraryTests(TestCase):
         self.assertEqual(response.status_code, 302)
         return Trip.objects.get(owner=self.owner)
 
+    def test_removing_unchecked_item_restores_ready_status(self):
+        from .models import ChecklistCheck
+
+        trip = self.create_trip('Kyoto', 'Japan')
+        for item in trip.checklist_items.all():
+            ChecklistCheck.objects.create(item=item, user=self.owner)
+        extra = trip.checklist_items.create(title='Camera', is_custom=True)
+        self.client.post(reverse('checklist_remove', args=[extra.pk]))
+        trip.refresh_from_db()
+        self.assertEqual(trip.status, Trip.Status.READY)
+
     def test_optional_items_can_be_removed_only_by_trip_travelers(self):
         trip = self.create_trip('Kyoto', 'Japan')
         mandatory = trip.checklist_items.filter(is_mandatory=True).first()

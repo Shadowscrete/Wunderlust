@@ -21,7 +21,7 @@ from .models import Activity, Checklist, ChecklistCheck, Flight, GroupMember, Gr
 from .trends import CITIES, destination_trends
 from .recommendations import ideas_for
 from .flight_status import FlightStatusError, get_flight_status, is_trackable
-from .models import trip_readiness
+from .models import refresh_ready_status, trip_readiness
 from accounts.social import avatar_url_for, initials_for
 
 User = get_user_model()
@@ -380,6 +380,7 @@ def trip_detail(request, trip_id):
                 item.trip = trip
                 item.is_custom = True
                 item.save()
+                refresh_ready_status(trip)
                 _notify_group(trip, 'Preparation list updated', f'{item.title} was added to the checklist.', request.user.pk)
                 messages.success(request, 'Custom item added.')
                 return redirect(f"{reverse('trip_detail', kwargs={'trip_id': trip.pk})}#preparation")
@@ -448,22 +449,14 @@ def checklist_toggle(request, item_id):
     is_checked = not removed
     trip = item.trip
     totals = _my_totals(trip.pk, request.user)
-    # The trip is Ready once every traveler has ticked every item; anything less puts it back to Planning.
-    readiness = _readiness_rows(trip, request.user)
-    everyone_ready = bool(readiness) and all(row['is_ready'] for row in readiness)
-    if everyone_ready and trip.status == Trip.Status.PLANNING:
-        trip.status = Trip.Status.READY
-        trip.save(update_fields=('status',))
-    elif not everyone_ready and trip.status == Trip.Status.READY:
-        trip.status = Trip.Status.PLANNING
-        trip.save(update_fields=('status',))
+    readiness = refresh_ready_status(trip)
     if trip.is_group_trip:
-        me = next((row for row in readiness if row['is_me']), None)
+        me = next((row for row in readiness if row['user'].pk == request.user.pk), None)
         if me and me['is_ready'] and is_checked:
             _notify_group(trip, 'A traveler is ready', f'{request.user.get_username()} has finished their checklist for {trip.destination}.', request.user.pk)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         # Background save from the trip page: send back fresh totals instead of reloading the page.
-        me = next((row for row in readiness if row['is_me']), {'percent': 0, 'done': 0, 'total': 0, 'is_ready': False})
+        me = next((row for row in readiness if row['user'].pk == request.user.pk), {'percent': 0, 'done': 0, 'total': 0, 'is_ready': False})
         return JsonResponse({
             'is_complete': is_checked, **totals,
             'trip_status': trip.status, 'trip_status_label': trip.get_status_display(),
@@ -481,6 +474,7 @@ def checklist_remove(request, item_id):
     )
     trip_id = item.trip_id
     item.delete()
+    refresh_ready_status(item.trip)
     messages.success(request, f'{item.title} removed from the preparation list.')
     return redirect(f"{reverse('trip_detail', args=[trip_id])}#preparation")
 
@@ -534,6 +528,7 @@ def trip_remove_member(request, trip_id, user_id):
     with transaction.atomic():
         ChecklistCheck.objects.filter(item__trip=trip, user=member.user).delete()
         member.delete()
+        refresh_ready_status(trip)
         RemovedMember.objects.get_or_create(group_trip=group, user=member.user)
         # trip=None: they no longer have access to the trip this notice is about.
         Notification.objects.create(user=member.user, title='Removed from a trip', message=f'The organizer removed you from the trip to {trip.destination}.')
@@ -550,6 +545,7 @@ def trip_join(request, invite_code):
     if request.method == 'POST':
         membership, created = GroupMember.objects.get_or_create(group_trip=group_trip, user=request.user)
         if created:
+            refresh_ready_status(group_trip.trip)
             _notify_group(group_trip.trip, 'A traveler joined your group', f'{request.user.get_username()} joined {group_trip.trip.destination}.', request.user.pk, kind='notify_member_joins')
             messages.success(request, f'You joined the trip to {group_trip.trip.destination}.')
         else:

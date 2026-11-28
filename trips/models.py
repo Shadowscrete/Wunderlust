@@ -207,6 +207,15 @@ def trip_readiness(trip):
     return out
 
 
+def refresh_ready_status(trip):
+    rows = trip_readiness(trip)
+    if trip.status in (Trip.Status.PLANNING, Trip.Status.READY):
+        status = Trip.Status.READY if rows and all(row['is_ready'] for row in rows) else Trip.Status.PLANNING
+        if status != trip.status and Trip.objects.filter(pk=trip.pk, status=trip.status).update(status=status):
+            trip.status = status
+    return rows
+
+
 class GroupTrip(models.Model):
     trip = models.OneToOneField(Trip, on_delete=models.CASCADE, related_name='group_trip')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_group_trips')
